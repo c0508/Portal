@@ -1,0 +1,318 @@
+@model ESGPlatform.Models.Entities.Campaign
+
+@{
+    ViewData["Title"] = "Campaign Details";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-megaphone"></i> @Model.Name</h1>
+        <span class="badge @GetStatusBadgeClass(Model.Status) fs-6">@Model.Status</span>
+    </div>
+    @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+    {
+        <div class="btn-group" role="group">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Edit Campaign
+            </a>
+            <a asp-action="ManageAssignments" asp-route-id="@Model.Id" class="btn btn-outline-info">
+                <i class="bi bi-people"></i> Manage Assignments
+            </a>
+        </div>
+    }
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Campaign Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Campaign Information</h5>
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <div class="mb-3">
+                        <strong>Description:</strong>
+                        <p class="mt-2">@Model.Description</p>
+                    </div>
+                }
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Organization:</strong>
+                        <p><i class="bi bi-building"></i> @Model.Organization?.Name</p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Created By:</strong>
+                        <p><i class="bi bi-person"></i> @Model.CreatedBy?.FirstName @Model.CreatedBy?.LastName</p>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Start Date:</strong>
+                        <p>
+                            @if (Model.StartDate.HasValue)
+                            {
+                                <i class="bi bi-calendar-event"></i> @Model.StartDate.Value.ToString("MMM dd, yyyy")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Not set</span>
+                            }
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>End Date:</strong>
+                        <p>
+                            @if (Model.EndDate.HasValue)
+                            {
+                                <i class="bi bi-calendar-x"></i> @Model.EndDate.Value.ToString("MMM dd, yyyy")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Not set</span>
+                            }
+                        </p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Deadline:</strong>
+                        <p>
+                            @if (Model.Deadline.HasValue)
+                            {
+                                <i class="bi bi-alarm"></i> @Model.Deadline.Value.ToString("MMM dd, yyyy")
+                            }
+                            else
+                            {
+                                <span class="text-muted">Not set</span>
+                            }
+                        </p>
+                    </div>
+                </div>
+
+                @if (Model.ReportingPeriodStart.HasValue || Model.ReportingPeriodEnd.HasValue)
+                {
+                    <div class="mt-3">
+                        <strong>Reporting Period:</strong>
+                        <p>
+                            <i class="bi bi-calendar-range"></i>
+                            @if (Model.ReportingPeriodStart.HasValue && Model.ReportingPeriodEnd.HasValue)
+                            {
+                                <span>@Model.ReportingPeriodStart.Value.ToString("MMM dd, yyyy") - @Model.ReportingPeriodEnd.Value.ToString("MMM dd, yyyy")</span>
+                            }
+                            else if (Model.ReportingPeriodStart.HasValue)
+                            {
+                                <span>From @Model.ReportingPeriodStart.Value.ToString("MMM dd, yyyy")</span>
+                            }
+                            else if (Model.ReportingPeriodEnd.HasValue)
+                            {
+                                <span>Until @Model.ReportingPeriodEnd.Value.ToString("MMM dd, yyyy")</span>
+                            }
+                        </p>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Model.Instructions))
+                {
+                    <div class="mt-3">
+                        <strong>Instructions:</strong>
+                        <div class="mt-2 p-3 bg-light rounded">
+                            @Html.Raw(Model.Instructions.Replace("\n", "<br/>"))
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Campaign Assignments -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-list-task"></i> Campaign Assignments (@Model.Assignments.Count())</h5>
+                @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                {
+                    <a asp-action="CreateAssignment" asp-route-campaignId="@Model.Id" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Assignment
+                    </a>
+                }
+            </div>
+            <div class="card-body">
+                @if (!Model.Assignments.Any())
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>No assignments yet.</strong>
+                        @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                        {
+                            <span>Click "Add Assignment" to assign questionnaires to organizations.</span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Organization</th>
+                                    <th>Questionnaire</th>
+                                    <th>Lead Responder</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var assignment in Model.Assignments)
+                                {
+                                    <tr>
+                                        <td>
+                                            <i class="bi bi-building"></i> @assignment.TargetOrganization?.Name
+                                        </td>
+                                        <td>
+                                            <strong>@assignment.QuestionnaireVersion?.Questionnaire?.Title</strong>
+                                            <br/>
+                                            <small class="text-muted">Version @assignment.QuestionnaireVersion?.VersionNumber</small>
+                                        </td>
+                                        <td>
+                                            @if (assignment.LeadResponder != null)
+                                            {
+                                                <i class="bi bi-person"></i> @assignment.LeadResponder.FirstName @assignment.LeadResponder.LastName
+                                                <br/>
+                                                <small class="text-muted">@assignment.LeadResponder.Email</small>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Not assigned</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetAssignmentStatusBadgeClass(assignment.Status)">
+                                                @assignment.Status
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <button class="btn btn-outline-primary btn-sm" title="View Responses">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                                @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                                                {
+                                                    <a asp-controller="QuestionAssignment" asp-action="Manage" asp-route-id="@assignment.Id" 
+                                                       class="btn btn-outline-success btn-sm" title="Manage Question Assignments">
+                                                        <i class="bi bi-person-plus"></i>
+                                                    </a>
+                                                    <button class="btn btn-outline-secondary btn-sm" title="Edit Assignment">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Campaign Statistics -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-graph-up"></i> Campaign Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <h4 class="text-primary">@Model.Assignments.Count()</h4>
+                            <small class="text-muted">Total Assignments</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-success">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved)</h4>
+                        <small class="text-muted">Completed</small>
+                    </div>
+                </div>
+                <hr/>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h4 class="text-warning">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.InProgress)</h4>
+                        <small class="text-muted">In Progress</small>
+                    </div>
+                    <div class="col-6">
+                        <h4 class="text-info">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.NotStarted)</h4>
+                        <small class="text-muted">Not Started</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaign Timeline -->
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-clock-history"></i> Timeline</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <i class="bi bi-plus-circle text-primary"></i>
+                        <div>
+                            <strong>Campaign Created</strong>
+                            <br/>
+                            <small class="text-muted">@Model.CreatedAt.ToString("MMM dd, yyyy 'at' h:mm tt")</small>
+                        </div>
+                    </div>
+                    @if (Model.UpdatedAt.HasValue)
+                    {
+                        <div class="timeline-item">
+                            <i class="bi bi-pencil text-warning"></i>
+                            <div>
+                                <strong>Last Updated</strong>
+                                <br/>
+                                <small class="text-muted">@Model.UpdatedAt.Value.ToString("MMM dd, yyyy 'at' h:mm tt")</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a asp-action="Index" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Campaigns
+    </a>
+</div>
+
+@functions {
+    string GetStatusBadgeClass(ESGPlatform.Models.Entities.CampaignStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.Entities.CampaignStatus.Draft => "bg-secondary",
+            ESGPlatform.Models.Entities.CampaignStatus.Active => "bg-success",
+            ESGPlatform.Models.Entities.CampaignStatus.Paused => "bg-warning",
+            ESGPlatform.Models.Entities.CampaignStatus.Completed => "bg-primary",
+            ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    string GetAssignmentStatusBadgeClass(ESGPlatform.Models.Entities.AssignmentStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.Entities.AssignmentStatus.NotStarted => "bg-secondary",
+            ESGPlatform.Models.Entities.AssignmentStatus.InProgress => "bg-warning",
+            ESGPlatform.Models.Entities.AssignmentStatus.Submitted => "bg-info",
+            ESGPlatform.Models.Entities.AssignmentStatus.UnderReview => "bg-primary",
+            ESGPlatform.Models.Entities.AssignmentStatus.Approved => "bg-success",
+            ESGPlatform.Models.Entities.AssignmentStatus.ChangesRequested => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+} 

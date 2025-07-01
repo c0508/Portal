@@ -1,0 +1,224 @@
+@model ESGPlatform.Models.ViewModels.QuestionChangeHistoryViewModel
+@{
+    ViewData["Title"] = "Question Change History";
+}
+
+@{
+    await Html.RenderPartialAsync("_BrandingStyles");
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="@Url.Action("Index")">Question Changes</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        Question #@Model.QuestionId
+                    </li>
+                </ol>
+            </nav>
+
+            <!-- Question Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-question-circle text-primary me-2"></i>
+                        Question Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6 class="text-muted mb-1">Question Text:</h6>
+                            <p class="mb-3">@Model.QuestionText</p>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-1">Questionnaire:</h6>
+                                    <p class="mb-2">@Model.QuestionnaireName</p>
+                                </div>
+                                @if (!string.IsNullOrEmpty(Model.Section))
+                                {
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-1">Section:</h6>
+                                        <span class="badge bg-secondary">@Model.Section</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="d-flex flex-column gap-2">
+                                <a href="@Url.Action("Edit", "Questionnaire", new { id = Model.QuestionId })" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-edit me-1"></i>
+                                    Edit Question
+                                </a>
+                                <a href="@Url.Action("Details", "Questionnaire", new { id = Model.QuestionId })" 
+                                   class="btn btn-outline-secondary btn-sm">
+                                    <i class="fas fa-eye me-1"></i>
+                                    View Question
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Change History -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history text-warning me-2"></i>
+                        Change History (@Model.Changes.Count changes)
+                    </h5>
+                    @if (Model.Changes.Any())
+                    {
+                        <small class="text-muted">
+                            Latest: @Model.Changes.First().ChangedAt.ToString("yyyy-MM-dd HH:mm")
+                        </small>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (Model.Changes.Any())
+                    {
+                        <div class="timeline">
+                            @foreach (var change in Model.Changes)
+                            {
+                                <div class="timeline-item">
+                                    <div class="timeline-marker">
+                                        <div class="timeline-marker-icon bg-@(change.ChangeType == "Added" ? "success" : change.ChangeType == "Removed" ? "danger" : "warning")">
+                                            <i class="fas fa-@(change.ChangeType == "Added" ? "plus" : change.ChangeType == "Removed" ? "minus" : "edit")"></i>
+                                        </div>
+                                    </div>
+                                    <div class="timeline-content">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <h6 class="card-title mb-1">
+                                                            <span class="badge bg-info me-2">@change.FormattedFieldName</span>
+                                                            <span class="badge bg-@(change.ChangeType == "Added" ? "success" : change.ChangeType == "Removed" ? "danger" : "warning")">
+                                                                @change.ChangeType
+                                                            </span>
+                                                        </h6>
+                                                        <small class="text-muted">
+                                                            @change.ChangedAt.ToString("yyyy-MM-dd HH:mm") by @change.ChangedByName
+                                                        </small>
+                                                    </div>
+                                                    <a href="@Url.Action("Details", new { id = change.Id })" 
+                                                       class="btn btn-outline-primary btn-sm">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                </div>
+
+                                                @if (!string.IsNullOrEmpty(change.OldValue) || !string.IsNullOrEmpty(change.NewValue))
+                                                {
+                                                    <div class="row">
+                                                        @if (!string.IsNullOrEmpty(change.OldValue))
+                                                        {
+                                                            <div class="col-md-6">
+                                                                <h6 class="text-muted mb-1">Old Value:</h6>
+                                                                <div class="border rounded p-2 bg-light">
+                                                                    <small class="text-muted">@change.OldValue</small>
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(change.NewValue))
+                                                        {
+                                                            <div class="col-md-6">
+                                                                <h6 class="text-muted mb-1">New Value:</h6>
+                                                                <div class="border rounded p-2 bg-white">
+                                                                    <small>@change.NewValue</small>
+                                                                </div>
+                                                            </div>
+                                                        }
+                                                    </div>
+                                                }
+
+                                                @if (!string.IsNullOrEmpty(change.ChangeReason))
+                                                {
+                                                    <div class="mt-2">
+                                                        <h6 class="text-muted mb-1">Reason:</h6>
+                                                        <small class="text-primary">@change.ChangeReason</small>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <div class="text-muted">
+                                <i class="fas fa-history fa-3x mb-3"></i>
+                                <h5>No changes recorded</h5>
+                                <p>This question hasn't been modified since change tracking was implemented.</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 1.5rem;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dee2e6;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 2rem;
+    }
+
+    .timeline-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -2rem;
+        top: 0;
+        z-index: 2;
+    }
+
+    .timeline-marker-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        border: 3px solid white;
+        box-shadow: 0 0 0 1px #dee2e6;
+    }
+
+    .timeline-content {
+        margin-left: 1rem;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: box-shadow 0.15s ease-in-out;
+    }
+</style> 

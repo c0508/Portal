@@ -1,0 +1,129 @@
+@model IEnumerable<ESGPlatform.Models.Entities.Organization>
+
+@{
+    ViewData["Title"] = "Organizations";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>@ViewData["Title"]</h2>
+    <a asp-action="Create" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Organization
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Users</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var org in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    @if (!string.IsNullOrEmpty(org.LogoUrl))
+                                    {
+                                        <img src="@org.LogoUrl" alt="@org.Name Logo" class="me-2" style="width: 32px; height: 32px; object-fit: contain;">
+                                    }
+                                    <div>
+                                        <strong>@org.Name</strong>
+                                        @if (!string.IsNullOrEmpty(org.PrimaryColor))
+                                        {
+                                            <span class="badge ms-2" style="background-color: @org.PrimaryColor; color: white;">@org.Theme</span>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge @(org.Type == ESGPlatform.Models.Entities.OrganizationType.PlatformOrganization ? "bg-primary" : "bg-info")">
+                                    @(org.Type == ESGPlatform.Models.Entities.OrganizationType.PlatformOrganization ? "Platform" : "Supplier")
+                                </span>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(org.Description))
+                                {
+                                    @(org.Description.Length > 100 ? org.Description.Substring(0, 100) + "..." : org.Description)
+                                }
+                                else
+                                {
+                                    <span class="text-muted">No description</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge bg-info">@org.Users.Count users</span>
+                            </td>
+                            <td>
+                                @if (org.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>@org.CreatedAt.ToString("MMM d, yyyy")</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a asp-action="Details" asp-route-id="@org.Id" class="btn btn-outline-primary" title="View Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a asp-action="Edit" asp-route-id="@org.Id" class="btn btn-outline-secondary" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form asp-action="ToggleStatus" asp-route-id="@org.Id" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn @(org.IsActive ? "btn-outline-warning" : "btn-outline-success")" 
+                                                title="@(org.IsActive ? "Deactivate" : "Activate")"
+                                                onclick="return confirm('@(org.IsActive ? "Deactivate" : "Activate") this organization?')">
+                                            <i class="bi @(org.IsActive ? "bi-pause" : "bi-play")"></i>
+                                        </button>
+                                    </form>
+                                    <a asp-action="Delete" asp-route-id="@org.Id" class="btn btn-outline-danger" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-building display-1 text-muted"></i>
+                <h4 class="text-muted mt-3">No Organizations Found</h4>
+                <p class="text-muted">Get started by creating your first organization.</p>
+                <a asp-action="Create" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create Organization
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Add any JavaScript for enhanced UX
+        $(document).ready(function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+} 

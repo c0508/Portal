@@ -1,0 +1,407 @@
+@model QuestionCreateViewModel
+
+@{
+    ViewData["Title"] = "Add Question";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-action="Index">Questionnaires</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@Model.QuestionnaireId">@Model.QuestionnaireTitle</a></li>
+                    <li class="breadcrumb-item"><a asp-action="ManageQuestions" asp-route-id="@Model.QuestionnaireId">Manage Questions</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Add Question</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        Add Question
+                    </h1>
+                    <p class="text-muted mb-0">@Model.QuestionnaireTitle</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-question-circle me-2"></i>
+                                Question Details
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form asp-action="AddQuestion" method="post">
+                                <input type="hidden" asp-for="QuestionnaireId" />
+                                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                                <div class="mb-3">
+                                    <label asp-for="QuestionText" class="form-label fw-bold"></label>
+                                    <textarea asp-for="QuestionText" class="form-control" rows="3" 
+                                              placeholder="Enter your question text here..."></textarea>
+                                    <span asp-validation-for="QuestionText" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="QuestionTypeMasterId" class="form-label fw-bold"></label>
+                                    <select asp-for="QuestionTypeMasterId" class="form-select" id="questionTypeSelect">
+                                        <option value="">Select question type</option>
+                                        @foreach (var questionType in Model.AvailableQuestionTypes)
+                                        {
+                                            <option value="@questionType.Id" 
+                                                    data-requires-options="@questionType.RequiresOptions.ToString().ToLower()"
+                                                    data-input-type="@questionType.InputType">
+                                                @questionType.Name - @questionType.Description
+                                            </option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="QuestionTypeMasterId" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3" id="optionsSection" style="display: none;">
+                                    <label asp-for="Options" class="form-label fw-bold"></label>
+                                    <textarea asp-for="Options" class="form-control" rows="5" 
+                                              placeholder="Enter each option on a new line..."></textarea>
+                                    <div class="form-text">Enter each option on a separate line</div>
+                                    <span asp-validation-for="Options" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="HelpText" class="form-label fw-bold"></label>
+                                    <textarea asp-for="HelpText" class="form-control" rows="2" 
+                                              placeholder="Optional help text to guide users..."></textarea>
+                                    <div class="form-text">Optional additional information to help users answer this question</div>
+                                    <span asp-validation-for="HelpText" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="Section" class="form-label fw-bold"></label>
+                                    <input asp-for="Section" class="form-control" 
+                                           placeholder="e.g., Environmental, Social, Governance, General"/>
+                                    <div class="form-text">Optional section to group related questions together for organization and filtering</div>
+                                    <span asp-validation-for="Section" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="DisplayOrder" class="form-label fw-bold"></label>
+                                    <input asp-for="DisplayOrder" class="form-control" type="number" min="1" />
+                                    <div class="form-text">Position of this question in the questionnaire</div>
+                                    <span asp-validation-for="DisplayOrder" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="ValidationRules" class="form-label fw-bold"></label>
+                                    <textarea asp-for="ValidationRules" class="form-control" rows="2" 
+                                              placeholder='{"minLength": 10, "maxLength": 500}'></textarea>
+                                    <div class="form-text">Optional validation rules in JSON format (for advanced users)</div>
+                                    <span asp-validation-for="ValidationRules" class="text-danger"></span>
+                                </div>
+
+                                <!-- Numeric Question Enhancements -->
+                                <div class="mb-3" id="numericEnhancementsSection" style="display: none;">
+                                    <div class="card border-primary bg-light">
+                                        <div class="card-body">
+                                            <h6 class="card-title text-primary mb-3">
+                                                <i class="bi bi-calculator me-2"></i>
+                                                Numeric Question Options
+                                            </h6>
+                                            
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="form-check mb-3">
+                                                        <input asp-for="IsPercentage" class="form-check-input" type="checkbox" id="percentageCheck" />
+                                                        <label asp-for="IsPercentage" class="form-check-label fw-bold">
+                                                            Percentage Question
+                                                        </label>
+                                                        <div class="form-text">Automatically adds % symbol and validates 0-100 range</div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="col-md-6">
+                                                    <label asp-for="Unit" class="form-label fw-bold">Unit of Measurement</label>
+                                                    <select asp-for="Unit" class="form-select" id="unitSelect">
+                                                        <option value="">Select unit (optional)</option>
+                                                        @if (Model.AvailableUnits?.Any() == true)
+                                                        {
+                                                            @foreach (var categoryGroup in Model.AvailableUnits)
+                                                            {
+                                                                <optgroup label="@categoryGroup.Key">
+                                                                    @foreach (var unit in categoryGroup.Value)
+                                                                    {
+                                                                        <option value="@unit.Code" title="@unit.Description">
+                                                                            @unit.Symbol - @unit.Name
+                                                                        </option>
+                                                                    }
+                                                                </optgroup>
+                                                            }
+                                                        }
+                                                    </select>
+                                                    <div class="form-text">Choose a unit for numeric responses (e.g., MWh, kg, km)</div>
+                                                    <span asp-validation-for="Unit" class="text-danger"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Question Attributes Section -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">Question Attributes</label>
+                                    <div class="form-text mb-2">Link this question to ESG standards and frameworks</div>
+                                    
+                                    <div class="row">
+                                        @if (Model.AvailableAttributes?.Any() == true)
+                                        {
+                                            @foreach (var categoryGroup in Model.AvailableAttributes.GroupBy(a => a.Category))
+                                            {
+                                                <div class="col-md-6 mb-3">
+                                                    <h6 class="text-primary mb-2">@categoryGroup.Key</h6>
+                                                    @foreach (var attribute in categoryGroup.OrderBy(a => a.DisplayOrder))
+                                                    {
+                                                        <div class="form-check form-check-sm mb-1">
+                                                            <input type="checkbox" class="form-check-input" 
+                                                                   name="SelectedAttributeIds" 
+                                                                   value="@(attribute.Id)"
+                                                                   id="attr_@(attribute.Id)" />
+                                                            <label class="form-check-label small" for="attr_@(attribute.Id)" title="@(attribute.Description)">
+                                                                <strong>@(attribute.Code)</strong> - @(attribute.Name)
+                                                            </label>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <div class="col-12">
+                                                <p class="text-muted small">No question attributes available</p>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <div class="form-check">
+                                        <input asp-for="IsRequired" class="form-check-input" type="checkbox" />
+                                        <label asp-for="IsRequired" class="form-check-label fw-bold">
+                                            Required Question
+                                        </label>
+                                        <div class="form-text">Users must answer this question to proceed</div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Add Question
+                                    </button>
+                                    <a asp-action="ManageQuestions" asp-route-id="@Model.QuestionnaireId" class="btn btn-outline-secondary">
+                                        <i class="bi bi-arrow-left me-1"></i>
+                                        Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Question Types
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6 class="fw-bold">Input Types</h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Text:</strong> Single line text input</li>
+                                    <li><strong>Long Text:</strong> Multi-line text area</li>
+                                    <li><strong>Number:</strong> Numeric values only</li>
+                                    <li><strong>Date:</strong> Date selection</li>
+                                    <li><strong>File Upload:</strong> Document attachments</li>
+                                </ul>
+                            </div>
+
+                            <div class="mb-3">
+                                <h6 class="fw-bold">Choice Types</h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Select:</strong> Dropdown menu</li>
+                                    <li><strong>Radio:</strong> Single choice buttons</li>
+                                    <li><strong>Checkbox:</strong> Multiple selections</li>
+                                    <li><strong>Yes/No:</strong> Simple binary choice</li>
+                                </ul>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <small>
+                                    <i class="bi bi-lightbulb me-1"></i>
+                                    <strong>Tip:</strong> Use help text to provide context and examples for complex questions.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0">
+                                <i class="bi bi-eye me-2"></i>
+                                Preview
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="questionPreview">
+                                <p class="text-muted">Select a question type to see a preview</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const questionTypeSelect = document.getElementById('questionTypeSelect');
+            const optionsSection = document.getElementById('optionsSection');
+            const numericEnhancementsSection = document.getElementById('numericEnhancementsSection');
+            const questionPreview = document.getElementById('questionPreview');
+            const questionTextInput = document.querySelector('[name="QuestionText"]');
+            const optionsInput = document.querySelector('[name="Options"]');
+            const percentageCheck = document.getElementById('percentageCheck');
+            const unitSelect = document.getElementById('unitSelect');
+
+            function updateOptionsVisibility() {
+                const selectedOption = questionTypeSelect.options[questionTypeSelect.selectedIndex];
+                const requiresOptions = selectedOption?.getAttribute('data-requires-options') === 'true';
+                const questionTypeCode = selectedOption?.getAttribute('data-input-type');
+                
+                optionsSection.style.display = requiresOptions ? 'block' : 'none';
+                numericEnhancementsSection.style.display = (questionTypeCode === 'number') ? 'block' : 'none';
+                
+                // Clear percentage and unit when not numeric
+                if (questionTypeCode !== 'number') {
+                    percentageCheck.checked = false;
+                    unitSelect.value = '';
+                }
+                
+                updatePreview();
+            }
+
+            function updatePreview() {
+                const questionType = questionTypeSelect.value;
+                const questionText = questionTextInput.value || 'Your question text will appear here';
+                const options = optionsInput.value;
+
+                let previewHtml = `<div class="mb-3"><label class="form-label fw-bold">${questionText}</label>`;
+
+                switch (questionType) {
+                    case 'Text':
+                        previewHtml += '<input type="text" class="form-control" placeholder="Text input">';
+                        break;
+                    case 'LongText':
+                        previewHtml += '<textarea class="form-control" rows="3" placeholder="Long text input"></textarea>';
+                        break;
+                    case 'Number':
+                        const isPercentage = percentageCheck.checked;
+                        const selectedUnit = unitSelect.value;
+                        const unitSymbol = selectedUnit ? unitSelect.options[unitSelect.selectedIndex].text.split(' - ')[0] : '';
+                        
+                        let placeholder = 'Number input';
+                        if (isPercentage) {
+                            placeholder = 'Enter percentage (0-100)';
+                        } else if (selectedUnit) {
+                            placeholder = `Enter value in ${unitSymbol}`;
+                        }
+                        
+                        previewHtml += `<div class="input-group">
+                            <input type="number" class="form-control" placeholder="${placeholder}"${isPercentage ? ' min="0" max="100"' : ''}>`;
+                        
+                        if (isPercentage) {
+                            previewHtml += '<span class="input-group-text">%</span>';
+                        } else if (selectedUnit) {
+                            previewHtml += `<span class="input-group-text">${unitSymbol}</span>`;
+                        }
+                        
+                        previewHtml += '</div>';
+                        break;
+                    case 'Date':
+                        previewHtml += '<input type="date" class="form-control">';
+                        break;
+                    case 'YesNo':
+                        previewHtml += '<div class="form-check"><input class="form-check-input" type="radio" name="preview" value="yes"><label class="form-check-label">Yes</label></div>';
+                        previewHtml += '<div class="form-check"><input class="form-check-input" type="radio" name="preview" value="no"><label class="form-check-label">No</label></div>';
+                        break;
+                    case 'Select':
+                        previewHtml += '<select class="form-select"><option>Choose an option...</option>';
+                        if (options) {
+                            options.split('\n').forEach(option => {
+                                if (option.trim()) {
+                                    previewHtml += `<option>${option.trim()}</option>`;
+                                }
+                            });
+                        }
+                        previewHtml += '</select>';
+                        break;
+                    case 'Radio':
+                        if (options) {
+                            options.split('\n').forEach(option => {
+                                if (option.trim()) {
+                                    previewHtml += `<div class="form-check"><input class="form-check-input" type="radio" name="preview"><label class="form-check-label">${option.trim()}</label></div>`;
+                                }
+                            });
+                        }
+                        break;
+                    case 'Checkbox':
+                        if (options) {
+                            options.split('\n').forEach(option => {
+                                if (option.trim()) {
+                                    previewHtml += `<div class="form-check"><input class="form-check-input" type="checkbox"><label class="form-check-label">${option.trim()}</label></div>`;
+                                }
+                            });
+                        }
+                        break;
+                    case 'FileUpload':
+                        previewHtml += '<input type="file" class="form-control">';
+                        break;
+                    default:
+                        previewHtml = '<p class="text-muted">Select a question type to see a preview</p>';
+                        return;
+                }
+
+                previewHtml += '</div>';
+                questionPreview.innerHTML = previewHtml;
+            }
+
+            questionTypeSelect.addEventListener('change', updateOptionsVisibility);
+            questionTextInput.addEventListener('input', updatePreview);
+            optionsInput.addEventListener('input', updatePreview);
+            percentageCheck.addEventListener('change', function() {
+                if (percentageCheck.checked) {
+                    unitSelect.value = '';
+                }
+                updatePreview();
+            });
+            
+            unitSelect.addEventListener('change', function() {
+                if (unitSelect.value) {
+                    percentageCheck.checked = false;
+                }
+                updatePreview();
+            });
+
+            // Initialize on page load
+            updateOptionsVisibility();
+        });
+    </script>
+} 

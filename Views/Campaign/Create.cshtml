@@ -1,0 +1,120 @@
+@model ESGPlatform.Models.ViewModels.CampaignCreateViewModel
+
+@{
+    ViewData["Title"] = "Create Campaign";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="bi bi-plus-circle"></i> Create New Campaign</h3>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="Name" class="form-label"></label>
+                            <input asp-for="Name" class="form-control" placeholder="Enter campaign name" />
+                            <span asp-validation-for="Name" class="text-danger"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="Description" class="form-label"></label>
+                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="Describe the purpose and goals of this campaign"></textarea>
+                            <span asp-validation-for="Description" class="text-danger"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="StartDate" class="form-label"></label>
+                            <input asp-for="StartDate" class="form-control" type="date" />
+                            <span asp-validation-for="StartDate" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="EndDate" class="form-label"></label>
+                            <input asp-for="EndDate" class="form-control" type="date" />
+                            <span asp-validation-for="EndDate" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="Deadline" class="form-label"></label>
+                            <input asp-for="Deadline" class="form-control" type="date" />
+                            <span asp-validation-for="Deadline" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <!-- Reporting Period Section -->
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-muted mb-3">
+                            <i class="bi bi-calendar-range me-2"></i>
+                            Reporting Period (Optional)
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label asp-for="ReportingPeriodStart" class="form-label fw-bold"></label>
+                                <input asp-for="ReportingPeriodStart" class="form-control" type="date" />
+                                <span asp-validation-for="ReportingPeriodStart" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="ReportingPeriodEnd" class="form-label fw-bold"></label>
+                                <input asp-for="ReportingPeriodEnd" class="form-control" type="date" />
+                                <span asp-validation-for="ReportingPeriodEnd" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="form-text">Specify the time period this campaign covers for data collection (e.g., FY2024, Q1 2024)</div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="Instructions" class="form-label"></label>
+                            <textarea asp-for="Instructions" class="form-control" rows="4" placeholder="Provide detailed instructions for campaign participants"></textarea>
+                            <span asp-validation-for="Instructions" class="text-danger"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Campaigns
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Create Campaign
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Campaign Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6>Campaign Workflow:</h6>
+                    <ol class="mb-0">
+                        <li>Create the campaign with basic information</li>
+                        <li>Add assignments to target organizations</li>
+                        <li>Select questionnaires for each assignment</li>
+                        <li>Activate the campaign to start data collection</li>
+                    </ol>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Important:</h6>
+                    <p class="mb-0">After creating the campaign, you'll need to add assignments to specify which organizations should complete which questionnaires.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+} 

@@ -1,0 +1,248 @@
+@model ESGPlatform.Models.Entities.Organization
+
+@{
+    ViewData["Title"] = "Organization Details";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>@ViewData["Title"]</h2>
+    <div>
+        <a asp-action="Index" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex align-items-center">
+                    @if (!string.IsNullOrEmpty(Model.LogoUrl))
+                    {
+                        <img src="@Model.LogoUrl" alt="@Model.Name Logo" class="me-3" style="width: 64px; height: 64px; object-fit: contain;">
+                    }
+                    <div>
+                        <h3 class="card-title mb-0">@Model.Name</h3>
+                        @if (!string.IsNullOrEmpty(Model.Theme))
+                        {
+                            <span class="badge mt-1" style="background-color: @(Model.PrimaryColor ?? "#007bff"); color: white;">@Model.Theme Theme</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Description</dt>
+                    <dd class="col-sm-9">
+                        @if (!string.IsNullOrEmpty(Model.Description))
+                        {
+                            @Model.Description
+                        }
+                        else
+                        {
+                            <span class="text-muted">No description provided</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-3">Type</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge @(Model.Type == ESGPlatform.Models.Entities.OrganizationType.PlatformOrganization ? "bg-primary" : "bg-info") me-2">
+                            @(Model.Type == ESGPlatform.Models.Entities.OrganizationType.PlatformOrganization ? "Platform Organization" : "Supplier Organization")
+                        </span>
+                        <br/>
+                        <small class="text-muted">
+                            @(Model.Type == ESGPlatform.Models.Entities.OrganizationType.PlatformOrganization ? 
+                                "Can create campaigns and send questionnaires to suppliers" : 
+                                "Responds to questionnaires from platform organizations")
+                        </small>
+                    </dd>
+
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">
+                        @if (Model.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-3">Theme</dt>
+                    <dd class="col-sm-9">@Model.Theme</dd>
+
+                    <dt class="col-sm-3">Primary Color</dt>
+                    <dd class="col-sm-9">
+                        @if (!string.IsNullOrEmpty(Model.PrimaryColor))
+                        {
+                            <span class="badge me-2" style="background-color: @Model.PrimaryColor; color: white;">@Model.PrimaryColor</span>
+                            <span class="text-muted">@Model.PrimaryColor</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Not set</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-3">Secondary Color</dt>
+                    <dd class="col-sm-9">
+                        @if (!string.IsNullOrEmpty(Model.SecondaryColor))
+                        {
+                            <span class="badge me-2" style="background-color: @Model.SecondaryColor; color: white;">@Model.SecondaryColor</span>
+                            <span class="text-muted">@Model.SecondaryColor</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Not set</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-3">Logo URL</dt>
+                    <dd class="col-sm-9">
+                        @if (!string.IsNullOrEmpty(Model.LogoUrl))
+                        {
+                            <a href="@Model.LogoUrl" target="_blank">@Model.LogoUrl</a>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No logo set</span>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-3">Created</dt>
+                    <dd class="col-sm-9">@Model.CreatedAt.ToString("MMMM d, yyyy 'at' h:mm tt")</dd>
+
+                    @if (Model.UpdatedAt.HasValue)
+                    {
+                        <dt class="col-sm-3">Last Updated</dt>
+                        <dd class="col-sm-9">@Model.UpdatedAt.Value.ToString("MMMM d, yyyy 'at' h:mm tt")</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-people"></i> Users (@Model.Users.Count)
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (Model.Users.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in Model.Users.OrderBy(u => u.LastName))
+                                {
+                                    <tr>
+                                        <td>@user.FirstName @user.LastName</td>
+                                        <td><a href="mailto:@user.Email">@user.Email</a></td>
+                                        <td>
+                                            @if (user.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>@user.CreatedAt.ToString("MMM d, yyyy")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-3">
+                        <i class="bi bi-people text-muted" style="font-size: 2rem;"></i>
+                        <p class="text-muted mt-2">No users in this organization yet.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">
+                        <i class="bi bi-pencil"></i> Edit Organization
+                    </a>
+                    
+                    <form asp-action="ToggleStatus" asp-route-id="@Model.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn @(Model.IsActive ? "btn-warning" : "btn-success") w-100"
+                                onclick="return confirm('@(Model.IsActive ? "Deactivate" : "Activate") this organization?')">
+                            <i class="bi @(Model.IsActive ? "bi-pause" : "bi-play")"></i>
+                            @(Model.IsActive ? "Deactivate" : "Activate")
+                        </button>
+                    </form>
+
+                    @if (!Model.Users.Any())
+                    {
+                        <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-outline-danger">
+                            <i class="bi bi-trash"></i> Delete Organization
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Statistics</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-6">Total Users:</dt>
+                    <dd class="col-6"><span class="badge bg-info">@Model.Users.Count</span></dd>
+                    
+                    <dt class="col-6">Active Users:</dt>
+                    <dd class="col-6"><span class="badge bg-success">@Model.Users.Count(u => u.IsActive)</span></dd>
+                    
+                    <dt class="col-6">Campaigns:</dt>
+                    <dd class="col-6"><span class="badge bg-secondary">@Model.CampaignsCreated.Count</span></dd>
+                    
+                    <dt class="col-6">Assignments:</dt>
+                    <dd class="col-6"><span class="badge bg-warning">@Model.CampaignAssignments.Count</span></dd>
+                </dl>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.PrimaryColor) || !string.IsNullOrEmpty(Model.SecondaryColor))
+        {
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Brand Preview</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="p-3 rounded" style="background: linear-gradient(135deg, @(Model.PrimaryColor ?? "#007bff") 0%, @(Model.SecondaryColor ?? "#6c757d") 100%);">
+                        <h6 class="text-white mb-0">@Model.Name</h6>
+                        <small class="text-white-50">@Model.Theme Theme</small>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div> 

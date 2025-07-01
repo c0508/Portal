@@ -1,0 +1,280 @@
+@model ESGPlatform.Models.ViewModels.SubmissionReviewViewModel
+@using ESGPlatform.Models.Entities
+
+@{
+    ViewData["Title"] = "Review Submission";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="mb-1">
+                                <i class="bi bi-clipboard-check"></i> Review Submission
+                            </h4>
+                            <h6 class="text-muted mb-2">@Model.QuestionnaireTitle (v@Model.VersionNumber)</h6>
+                            <p class="mb-1"><strong>Campaign:</strong> @Model.CampaignName</p>
+                            <p class="mb-1"><strong>Organization:</strong> @Model.OrganizationName</p>
+                            @if (Model.Deadline.HasValue)
+                            {
+                                <p class="mb-0">
+                                    <strong>Deadline:</strong> 
+                                    <span class="@(Model.Deadline.Value < DateTime.Now ? "text-danger" : "text-muted")">
+                                        @Model.Deadline.Value.ToString("MMM dd, yyyy")
+                                    </span>
+                                </p>
+                            }
+                        </div>
+                        <div class="text-end">
+                            <div class="mb-2">
+                                <span class="badge bg-info fs-6">
+                                    @Model.AnsweredQuestions / @Model.TotalQuestions Questions Answered
+                                </span>
+                            </div>
+                            @if (Model.RequiredQuestions > 0)
+                            {
+                                <div class="mb-2">
+                                    <span class="badge @(Model.AnsweredRequiredQuestions == Model.RequiredQuestions ? "bg-success" : "bg-warning") fs-6">
+                                        @Model.AnsweredRequiredQuestions / @Model.RequiredQuestions Required Answered
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.CanSubmit)
+    {
+        <!-- Missing Required Questions Alert -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Missing Required Questions</h6>
+                    <p class="mb-2">Please answer all required questions before submitting:</p>
+                    <ul class="mb-0">
+                        @foreach (var question in Model.MissingRequiredQuestions)
+                        {
+                            <li>@question</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Questions Review -->
+    <div class="row">
+        <div class="col-lg-9">
+            <div class="card">
+                <div class="card-header">
+                    <h6><i class="bi bi-list-check"></i> All Questions & Responses</h6>
+                </div>
+                <div class="card-body">
+                    @foreach (var question in Model.Questions.OrderBy(q => q.QuestionId))
+                    {
+                        <div class="border-bottom pb-3 mb-3 @(question == Model.Questions.Last() ? "border-0 pb-0 mb-0" : "")">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        Question @(Model.Questions.ToList().IndexOf(question) + 1)
+                                        @if (question.IsRequired)
+                                        {
+                                            <span class="text-danger">*</span>
+                                        }
+                                    </h6>
+                                    <p class="mb-0">@question.QuestionText</p>
+                                </div>
+                                <div class="ms-3">
+                                    @if (question.HasResponse)
+                                    {
+                                        <span class="badge bg-success"><i class="bi bi-check"></i> Answered</span>
+                                    }
+                                    else if (question.IsDelegated)
+                                    {
+                                        <span class="badge bg-warning"><i class="bi bi-share"></i> Delegated</span>
+                                    }
+                                    else if (question.IsRequired)
+                                    {
+                                        <span class="badge bg-danger">Required</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Not Answered</span>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (question.HasResponse && !string.IsNullOrEmpty(question.ResponseSummary))
+                            {
+                                <div class="bg-light p-3 rounded">
+                                    <h6 class="text-success mb-2"><i class="bi bi-chat-quote"></i> Your Answer:</h6>
+                                    @switch (question.QuestionType)
+                                    {
+                                        case QuestionType.YesNo:
+                                            <p class="mb-0">
+                                                <span class="badge @(question.ResponseSummary.ToLower() == "true" ? "bg-success" : "bg-secondary")">
+                                                    @(question.ResponseSummary.ToLower() == "true" ? "Yes" : "No")
+                                                </span>
+                                            </p>
+                                            break;
+                                        case QuestionType.Date:
+                                            <p class="mb-0">
+                                                <i class="bi bi-calendar3"></i>
+                                                @DateTime.Parse(question.ResponseSummary).ToString("MMMM dd, yyyy")
+                                            </p>
+                                            break;
+                                        case QuestionType.Number:
+                                            <p class="mb-0">
+                                                <i class="bi bi-123"></i>
+                                                @question.ResponseSummary
+                                            </p>
+                                            break;
+                                        case QuestionType.LongText:
+                                            <div class="border p-2 bg-white rounded">
+                                                @Html.Raw(question.ResponseSummary.Replace("\n", "<br/>"))
+                                            </div>
+                                            break;
+                                        case QuestionType.MultiSelect:
+                                        case QuestionType.Checkbox:
+                                            @foreach (var value in question.ResponseSummary.Split(',').Select(v => v.Trim()))
+                                            {
+                                                <span class="badge bg-primary me-1">@value</span>
+                                            }
+                                            break;
+                                        case QuestionType.FileUpload:
+                                            <p class="mb-0">
+                                                <i class="bi bi-file-earmark"></i>
+                                                @question.ResponseSummary
+                                            </p>
+                                            break;
+                                        default:
+                                            <p class="mb-0">@question.ResponseSummary</p>
+                                            break;
+                                    }
+                                </div>
+                            }
+                            else if (question.IsDelegated)
+                            {
+                                <div class="alert alert-warning mb-0">
+                                    <i class="bi bi-share"></i> This question has been delegated to: <strong>@question.DelegatedTo</strong>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-light mb-0">
+                                    <i class="bi bi-dash-circle text-muted"></i> No answer provided
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-3">
+            <div class="card position-sticky" style="top: 20px;">
+                <div class="card-header">
+                    <h6><i class="bi bi-speedometer2"></i> Submission Summary</h6>
+                </div>
+                <div class="card-body">
+                    <!-- Progress -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>Overall Progress</small>
+                            <small>@((Model.AnsweredQuestions * 100 / Model.TotalQuestions))%</small>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar @(Model.CanSubmit ? "bg-success" : "bg-warning")" 
+                                 role="progressbar" 
+                                 style="width: @((Model.AnsweredQuestions * 100 / Model.TotalQuestions))%">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistics -->
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <div class="h5 mb-0 text-success">@Model.AnsweredQuestions</div>
+                                <small class="text-muted">Answered</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <div class="h5 mb-0 text-muted">@(Model.TotalQuestions - Model.AnsweredQuestions)</div>
+                                <small class="text-muted">Remaining</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (Model.RequiredQuestions > 0)
+                    {
+                        <div class="row text-center mb-3">
+                            <div class="col-12">
+                                <div class="border rounded p-2 @(Model.AnsweredRequiredQuestions == Model.RequiredQuestions ? "border-success bg-light" : "border-warning")">
+                                    <div class="h6 mb-0 @(Model.AnsweredRequiredQuestions == Model.RequiredQuestions ? "text-success" : "text-warning")">
+                                        @Model.AnsweredRequiredQuestions / @Model.RequiredQuestions
+                                    </div>
+                                    <small class="text-muted">Required Questions</small>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Actions -->
+                    <div class="d-grid gap-2">
+                        @if (Model.CanSubmit)
+                        {
+                            <form asp-action="SubmitAssignment" method="post">
+                                <input type="hidden" name="id" value="@Model.AssignmentId" />
+                                <button type="submit" class="btn btn-success w-100" 
+                                        onclick="return confirm('Are you sure you want to submit this questionnaire? You will not be able to make changes after submission.')">
+                                    <i class="bi bi-check-circle"></i> Submit Questionnaire
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-success w-100" disabled>
+                                <i class="bi bi-exclamation-triangle"></i> Complete Required Questions
+                            </button>
+                        }
+                        
+                        <a asp-action="AnswerQuestionnaire" asp-route-id="@Model.AssignmentId" 
+                           class="btn btn-outline-primary w-100">
+                            <i class="bi bi-arrow-left"></i> Back to Questions
+                        </a>
+                        
+                        <a asp-action="Index" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-house"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Smooth scrolling for any internal links
+        $('a[href^="#"]').click(function(e) {
+            e.preventDefault();
+            var target = $(this.getAttribute('href'));
+            if (target.length) {
+                $('html, body').animate({
+                    scrollTop: target.offset().top - 100
+                }, 500);
+            }
+        });
+    </script>
+} 

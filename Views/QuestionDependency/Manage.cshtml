@@ -1,0 +1,246 @@
+@using ESGPlatform.Models.Entities
+@{
+    ViewData["Title"] = "Manage Conditional Questions";
+    var questionnaire = ViewBag.Questionnaire as Questionnaire;
+    var questions = ViewBag.Questions as List<Question>;
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>Conditional Questions</h2>
+                    <p class="text-muted">@questionnaire.Title</p>
+                </div>
+                <a href="@Url.Action("Details", "Questionnaire", new { id = questionnaire.Id })" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Questionnaire
+                </a>
+            </div>
+
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["Success"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            <!-- Create New Dependency -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus"></i> Add Conditional Logic
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="Create" method="post">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Question to Hide/Show</label>
+                                <select name="questionId" class="form-select" required>
+                                    <option value="">Select question...</option>
+                                    @foreach (var question in questions)
+                                    {
+                                        <option value="@question.Id">@($"{question.DisplayOrder}. {question.QuestionText}")</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Depends On Question</label>
+                                <select name="dependsOnQuestionId" class="form-select" required>
+                                    <option value="">Select question...</option>
+                                    @foreach (var question in questions)
+                                    {
+                                        <option value="@question.Id">@($"{question.DisplayOrder}. {question.QuestionText}")</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Condition</label>
+                                <select name="conditionType" class="form-select" required>
+                                    <option value="@DependencyConditionType.Equals">Equals</option>
+                                    <option value="@DependencyConditionType.NotEquals">Not Equals</option>
+                                    <option value="@DependencyConditionType.IsAnswered">Is Answered</option>
+                                    <option value="@DependencyConditionType.IsNotAnswered">Is Not Answered</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Value <small class="text-muted">(if needed)</small></label>
+                                <input type="text" name="conditionValue" class="form-control" placeholder="Value...">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="submit" class="btn btn-primary d-block w-100">
+                                    <i class="fas fa-plus"></i> Add Rule
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Existing Dependencies -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> Current Conditional Logic Rules
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (questions.Any(q => q.Dependencies.Any()))
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Question</th>
+                                        <th>Depends On</th>
+                                        <th>Condition</th>
+                                        <th>Value</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var question in questions.Where(q => q.Dependencies.Any()))
+                                    {
+                                        @foreach (var dependency in question.Dependencies.OrderBy(d => d.Id))
+                                        {
+                                            <tr class="@(dependency.IsActive ? "" : "table-secondary")">
+                                                <td>
+                                                    <strong>@($"{question.DisplayOrder}. {question.QuestionText}")</strong>
+                                                    <br><small class="text-muted">@question.QuestionType</small>
+                                                </td>
+                                                <td>
+                                                    <strong>@($"{dependency.DependsOnQuestion.DisplayOrder}. {dependency.DependsOnQuestion.QuestionText}")</strong>
+                                                    <br><small class="text-muted">@dependency.DependsOnQuestion.QuestionType</small>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info">@dependency.ConditionType.ToString()</span>
+                                                    <br><small class="text-success">
+                                                        <i class="fas fa-eye"></i> Show question when condition is met
+                                                    </small>
+                                                </td>
+                                                <td>
+                                                    @if (!string.IsNullOrEmpty(dependency.ConditionValue))
+                                                    {
+                                                        <code>@dependency.ConditionValue</code>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">—</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (dependency.IsActive)
+                                                    {
+                                                        <span class="badge bg-success">Active</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">Inactive</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <form asp-action="Toggle" method="post" class="d-inline">
+                                                            <input type="hidden" name="id" value="@dependency.Id" />
+                                                            <button type="submit" class="btn @(dependency.IsActive ? "btn-outline-warning" : "btn-outline-success")" 
+                                                                    title="@(dependency.IsActive ? "Deactivate" : "Activate")">
+                                                                <i class="fas @(dependency.IsActive ? "fa-pause" : "fa-play")"></i>
+                                                            </button>
+                                                        </form>
+                                                        <form asp-action="Delete" method="post" class="d-inline" 
+                                                              onsubmit="return confirm('Are you sure you want to delete this dependency?')">
+                                                            <input type="hidden" name="id" value="@dependency.Id" />
+                                                            <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Conditional Logic Rules</h5>
+                            <p class="text-muted">Add rules above to show/hide questions based on previous answers.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Help Text -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-question-circle"></i> How Conditional Logic Works
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Condition Types:</h6>
+                            <ul class="small">
+                                <li><strong>Equals:</strong> Show question when the previous answer equals the specified value</li>
+                                <li><strong>Not Equals:</strong> Show question when the previous answer is different from the specified value</li>
+                                <li><strong>Is Answered:</strong> Show question when the previous question has any answer</li>
+                                <li><strong>Is Not Answered:</strong> Show question when the previous question is empty</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Important Notes:</h6>
+                            <ul class="small">
+                                <li>Questions are hidden by default if they have dependencies</li>
+                                <li>All dependencies must be satisfied for a question to show</li>
+                                <li>Values are case-insensitive for text comparisons</li>
+                                <li>Changes take effect immediately on the response form</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Simple validation to prevent circular dependencies
+document.addEventListener('DOMContentLoaded', function() {
+    const questionSelect = document.querySelector('select[name="questionId"]');
+    const dependsOnSelect = document.querySelector('select[name="dependsOnQuestionId"]');
+    
+    function updateOptions() {
+        const selectedQuestion = questionSelect.value;
+        const selectedDependsOn = dependsOnSelect.value;
+        
+        // Disable same option in both selects
+        Array.from(questionSelect.options).forEach(option => {
+            option.disabled = option.value === selectedDependsOn && option.value !== '';
+        });
+        
+        Array.from(dependsOnSelect.options).forEach(option => {
+            option.disabled = option.value === selectedQuestion && option.value !== '';
+        });
+    }
+    
+    questionSelect.addEventListener('change', updateOptions);
+    dependsOnSelect.addEventListener('change', updateOptions);
+});
+</script> 

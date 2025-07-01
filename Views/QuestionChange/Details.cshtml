@@ -1,0 +1,268 @@
+@model ESGPlatform.Models.ViewModels.QuestionChangeViewModel
+@{
+    ViewData["Title"] = "Change Details";
+    var question = ViewBag.Question as ESGPlatform.Models.Entities.Question;
+    var questionnaire = ViewBag.Questionnaire as ESGPlatform.Models.Entities.Questionnaire;
+}
+
+@{
+    await Html.RenderPartialAsync("_BrandingStyles");
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb" class="mb-4">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="@Url.Action("Index")">Question Changes</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="@Url.Action("Question", new { id = question?.Id })">Question #@question?.Id</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        Change Details
+                    </li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-info-circle text-primary me-2"></i>
+                    Change Details
+                </h1>
+                <div class="btn-group" role="group">
+                    <a href="@Url.Action("Question", new { id = question?.Id })" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Back to Question History
+                    </a>
+                    <a href="@Url.Action("Index")" class="btn btn-outline-primary">
+                        <i class="fas fa-list me-1"></i>
+                        All Changes
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Change Information -->
+                <div class="col-md-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-edit text-warning me-2"></i>
+                                Change Information
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-1">Field Changed:</h6>
+                                    <span class="badge bg-info fs-6">@Model.FormattedFieldName</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-1">Change Type:</h6>
+                                    <span class="badge bg-@(Model.ChangeType == "Added" ? "success" : Model.ChangeType == "Removed" ? "danger" : "warning") fs-6">
+                                        @Model.ChangeType
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-1">Changed By:</h6>
+                                    <div>
+                                        <div class="fw-medium">@Model.ChangedByName</div>
+                                        <small class="text-muted">@Model.ChangedByEmail</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted mb-1">Date & Time:</h6>
+                                    <div>
+                                        <div>@Model.ChangedAt.ToString("dddd, MMMM dd, yyyy")</div>
+                                        <small class="text-muted">@Model.ChangedAt.ToString("HH:mm:ss")</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(Model.ChangeReason))
+                            {
+                                <div class="mb-3">
+                                    <h6 class="text-muted mb-1">Reason for Change:</h6>
+                                    <div class="border rounded p-3 bg-light">
+                                        <i class="fas fa-quote-left text-muted me-2"></i>
+                                        @Model.ChangeReason
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Value Changes -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-exchange-alt text-info me-2"></i>
+                                Value Changes
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrEmpty(Model.OldValue) || !string.IsNullOrEmpty(Model.NewValue))
+                            {
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="fas fa-arrow-left text-danger me-1"></i>
+                                            Previous Value:
+                                        </h6>
+                                        <div class="border rounded p-3 bg-light min-height-100">
+                                            @if (!string.IsNullOrEmpty(Model.OldValue))
+                                            {
+                                                <div class="text-muted">@Model.OldValue</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-muted fst-italic">No previous value</div>
+                                            }
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="fas fa-arrow-right text-success me-1"></i>
+                                            New Value:
+                                        </h6>
+                                        <div class="border rounded p-3 bg-white min-height-100">
+                                            @if (!string.IsNullOrEmpty(Model.NewValue))
+                                            {
+                                                <div>@Model.NewValue</div>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-muted fst-italic">Value removed</div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(Model.OldValue) && !string.IsNullOrEmpty(Model.NewValue))
+                                {
+                                    <div class="mt-3">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="fas fa-code-branch text-warning me-1"></i>
+                                            Side-by-side Comparison:
+                                        </h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="diff-old">
+                                                    <pre class="mb-0 p-2 bg-danger bg-opacity-10 border rounded">@Model.OldValue</pre>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="diff-new">
+                                                    <pre class="mb-0 p-2 bg-success bg-opacity-10 border rounded">@Model.NewValue</pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="text-center py-4 text-muted">
+                                    <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                                    <p class="mb-0">No value changes recorded for this modification.</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Question Context -->
+                <div class="col-md-4">
+                    <div class="card sticky-top" style="top: 1rem;">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-question-circle text-secondary me-2"></i>
+                                Question Context
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            @if (question != null && questionnaire != null)
+                            {
+                                <div class="mb-3">
+                                    <h6 class="text-muted mb-1">Question ID:</h6>
+                                    <div class="fw-medium">#@question.Id</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="text-muted mb-1">Questionnaire:</h6>
+                                    <div>@questionnaire.Title</div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(question.Section))
+                                {
+                                    <div class="mb-3">
+                                        <h6 class="text-muted mb-1">Section:</h6>
+                                        <span class="badge bg-secondary">@question.Section</span>
+                                    </div>
+                                }
+
+                                <div class="mb-3">
+                                    <h6 class="text-muted mb-1">Question Text:</h6>
+                                    <div class="small text-break">@question.QuestionText</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="text-muted mb-1">Question Type:</h6>
+                                    <span class="badge bg-info">@question.QuestionType</span>
+                                </div>
+
+                                <div class="d-grid gap-2">
+                                    <a href="@Url.Action("Question", new { id = question.Id })" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-history me-1"></i>
+                                        View All Changes
+                                    </a>
+                                    <a href="@Url.Action("Edit", "Questionnaire", new { id = question.Id })" 
+                                       class="btn btn-outline-secondary btn-sm">
+                                        <i class="fas fa-edit me-1"></i>
+                                        Edit Question
+                                    </a>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-muted text-center py-3">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <p class="mb-0 small">Question information not available</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .min-height-100 {
+        min-height: 100px;
+    }
+    
+    .diff-old pre {
+        border-left: 4px solid #dc3545;
+    }
+    
+    .diff-new pre {
+        border-left: 4px solid #198754;
+    }
+    
+    .card.sticky-top {
+        z-index: 1020;
+    }
+    
+    .text-break {
+        word-wrap: break-word;
+        word-break: break-word;
+    }
+</style> 

@@ -1,0 +1,320 @@
+@model ESGPlatform.Models.ViewModels.DelegationDashboardViewModel
+@{
+    ViewData["Title"] = "Delegation Management";
+}
+
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-share"></i> Delegation Management</h2>
+                    <p class="text-muted mb-0">Manage question delegations and track progress</p>
+                </div>
+                <div>
+                    <a asp-action="History" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-clock-history"></i> View History
+                    </a>
+                    <a asp-action="Timeline" class="btn btn-outline-info">
+                        <i class="bi bi-diagram-2"></i> Timeline
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">@Model.Statistics.TotalDelegationsReceived</h4>
+                            <small>Received</small>
+                        </div>
+                        <i class="bi bi-arrow-down-circle fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">@Model.Statistics.TotalDelegationsGiven</h4>
+                            <small>Given</small>
+                        </div>
+                        <i class="bi bi-arrow-up-circle fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">@Model.Statistics.PendingReceived</h4>
+                            <small>Pending (Received)</small>
+                        </div>
+                        <i class="bi bi-hourglass-split fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4 class="mb-0">@Model.Statistics.OverdueReceived</h4>
+                            <small>Overdue</small>
+                        </div>
+                        <i class="bi bi-exclamation-triangle fs-2"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Completion Rate Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Completion Rate - Received Delegations</h6>
+                    <div class="progress mb-2" style="height: 20px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: @Model.Statistics.CompletionRateReceived%"
+                             aria-valuenow="@Model.Statistics.CompletionRateReceived" aria-valuemin="0" aria-valuemax="100">
+                            @Model.Statistics.CompletionRateReceived.ToString("F1")%
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        @Model.Statistics.CompletedReceived of @Model.Statistics.TotalDelegationsReceived completed
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Completion Rate - Given Delegations</h6>
+                    <div class="progress mb-2" style="height: 20px;">
+                        <div class="progress-bar bg-info" role="progressbar" 
+                             style="width: @Model.Statistics.CompletionRateGiven%"
+                             aria-valuenow="@Model.Statistics.CompletionRateGiven" aria-valuemin="0" aria-valuemax="100">
+                            @Model.Statistics.CompletionRateGiven.ToString("F1")%
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        @Model.Statistics.CompletedGiven of @Model.Statistics.TotalDelegationsGiven completed
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Delegations Received -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-arrow-down-circle text-primary"></i> 
+                        Delegations Received (@Model.DelegationsReceived.Count)
+                    </h5>
+                    @if (Model.DelegationsReceived.Any())
+                    {
+                        <a asp-action="History" asp-route-filterType="Received" class="btn btn-sm btn-outline-primary">
+                            View All
+                        </a>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (Model.DelegationsReceived.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var delegation in Model.DelegationsReceived.Take(5))
+                            {
+                                <div class="list-group-item border-0 px-0">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a asp-action="Details" asp-route-id="@delegation.Id" class="text-decoration-none">
+                                                    @(delegation.QuestionText.Length > 60 ? delegation.QuestionText.Substring(0, 60) + "..." : delegation.QuestionText)
+                                                </a>
+                                            </h6>
+                                            <p class="mb-1 text-muted small">
+                                                <strong>From:</strong> @delegation.FromUserName<br/>
+                                                <strong>Campaign:</strong> @delegation.CampaignName
+                                            </p>
+                                            @if (!string.IsNullOrEmpty(delegation.Instructions))
+                                            {
+                                                <p class="mb-1 small text-muted">
+                                                    <em>"@(delegation.Instructions.Length > 80 ? delegation.Instructions.Substring(0, 80) + "..." : delegation.Instructions)"</em>
+                                                </p>
+                                            }
+                                            <small class="text-muted">
+                                                @delegation.CreatedAt.ToString("MMM dd, yyyy")
+                                                @if (delegation.Deadline.HasValue)
+                                                {
+                                                    <span class="@(delegation.IsOverdue ? "text-danger" : "")">
+                                                        - Due: @delegation.Deadline.Value.ToString("MMM dd")
+                                                    </span>
+                                                }
+                                            </small>
+                                        </div>
+                                        <div class="ms-3">
+                                            <span class="badge @GetStatusBadgeClass(delegation.Status)">
+                                                @delegation.Status
+                                            </span>
+                                            @if (delegation.HasResponse)
+                                            {
+                                                <br/><small class="text-success"><i class="bi bi-check-circle"></i> Answered</small>
+                                            }
+                                        </div>
+                                    </div>
+                                    @if (delegation.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                                    {
+                                        <div class="mt-2">
+                                            <a asp-controller="Response" asp-action="AnswerQuestionnaire" asp-route-id="@delegation.CampaignAssignmentId" 
+                                               class="btn btn-sm btn-primary">
+                                                <i class="bi bi-pencil"></i> Answer
+                                            </a>
+                                            @if (delegation.HasResponse)
+                                            {
+                                                <form asp-action="Complete" asp-route-id="@delegation.Id" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-success ms-1">
+                                                        <i class="bi bi-check"></i> Mark Complete
+                                                    </button>
+                                                </form>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <p class="text-muted mt-2">No delegations received</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Delegations Given -->
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-arrow-up-circle text-success"></i> 
+                        Delegations Given (@Model.DelegationsGiven.Count)
+                    </h5>
+                    @if (Model.DelegationsGiven.Any())
+                    {
+                        <a asp-action="History" asp-route-filterType="Given" class="btn btn-sm btn-outline-success">
+                            View All
+                        </a>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (Model.DelegationsGiven.Any())
+                    {
+                        <div class="list-group list-group-flush">
+                            @foreach (var delegation in Model.DelegationsGiven.Take(5))
+                            {
+                                <div class="list-group-item border-0 px-0">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a asp-action="Details" asp-route-id="@delegation.Id" class="text-decoration-none">
+                                                    @(delegation.QuestionText.Length > 60 ? delegation.QuestionText.Substring(0, 60) + "..." : delegation.QuestionText)
+                                                </a>
+                                            </h6>
+                                            <p class="mb-1 text-muted small">
+                                                <strong>To:</strong> @delegation.ToUserName<br/>
+                                                <strong>Campaign:</strong> @delegation.CampaignName
+                                            </p>
+                                            @if (!string.IsNullOrEmpty(delegation.Instructions))
+                                            {
+                                                <p class="mb-1 small text-muted">
+                                                    <em>"@(delegation.Instructions.Length > 80 ? delegation.Instructions.Substring(0, 80) + "..." : delegation.Instructions)"</em>
+                                                </p>
+                                            }
+                                            <small class="text-muted">
+                                                @delegation.CreatedAt.ToString("MMM dd, yyyy")
+                                                @if (delegation.Deadline.HasValue)
+                                                {
+                                                    <span class="@(delegation.IsOverdue ? "text-danger" : "")">
+                                                        - Due: @delegation.Deadline.Value.ToString("MMM dd")
+                                                    </span>
+                                                }
+                                            </small>
+                                        </div>
+                                        <div class="ms-3">
+                                            <span class="badge @GetStatusBadgeClass(delegation.Status)">
+                                                @delegation.Status
+                                            </span>
+                                            @if (delegation.HasResponse)
+                                            {
+                                                <br/><small class="text-success"><i class="bi bi-check-circle"></i> Answered</small>
+                                            }
+                                        </div>
+                                    </div>
+                                    @if (delegation.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                                    {
+                                        <div class="mt-2">
+                                            <a asp-action="Details" asp-route-id="@delegation.Id" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i> View Details
+                                            </a>
+                                            <form asp-action="Cancel" asp-route-id="@delegation.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-outline-danger ms-1" 
+                                                        onclick="return confirm('Are you sure you want to cancel this delegation?')">
+                                                    <i class="bi bi-x"></i> Cancel
+                                                </button>
+                                            </form>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-share fs-1 text-muted"></i>
+                            <p class="text-muted mt-2">No delegations given</p>
+                            <a asp-controller="Response" asp-action="Index" class="btn btn-primary">
+                                <i class="bi bi-plus"></i> Create Delegation
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    string GetStatusBadgeClass(ESGPlatform.Models.ViewModels.DelegationStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.ViewModels.DelegationStatus.Pending => "bg-warning",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Completed => "bg-success",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Overdue => "bg-danger",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Cancelled => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+} 

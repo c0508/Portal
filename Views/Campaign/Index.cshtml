@@ -1,0 +1,167 @@
+@model IEnumerable<ESGPlatform.Models.Entities.Campaign>
+
+@{
+    ViewData["Title"] = "Campaigns";
+    var brandingContext = ViewBag.BrandingContext as ESGPlatform.Services.BrandingContext;
+    var isSupplierOrg = ViewBag.IsCurrentOrgSupplierType == true;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-megaphone"></i> Campaigns</h1>
+    @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+    {
+        <a asp-action="Create" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Create Campaign
+        </a>
+    }
+</div>
+
+@* Show organization context switcher for supplier organizations *@
+@if (isSupplierOrg)
+{
+    <partial name="_OrganizationContextSwitcher" />
+}
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        <strong>No campaigns found.</strong>
+        @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+        {
+            <span>Click "Create Campaign" to get started.</span>
+        }
+        else if (isSupplierOrg)
+        {
+            <span>No campaigns have been assigned to your organization yet. Try switching your organization context above to view campaigns from partner organizations.</span>
+        }
+    </div>
+}
+else
+{
+    <div class="row campaign-branded">
+        @foreach (var campaign in Model)
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header branded d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            @if (!string.IsNullOrEmpty(campaign.Organization?.LogoUrl))
+                            {
+                                <img src="@campaign.Organization.LogoUrl" alt="@campaign.Organization.Name Logo" style="height: 24px; width: auto; margin-right: 8px;">
+                            }
+                            <h5 class="card-title mb-0 text-white">@campaign.Name</h5>
+                        </div>
+                        <span class="badge bg-light text-dark">
+                            @campaign.Status
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(campaign.Description))
+                        {
+                            <p class="card-text">@campaign.Description</p>
+                        }
+                        
+                        <div class="row text-muted small">
+                            <div class="col-6">
+                                <i class="bi bi-building"></i> @campaign.Organization?.Name
+                            </div>
+                            <div class="col-6">
+                                <i class="bi bi-person"></i> @campaign.CreatedBy?.FirstName @campaign.CreatedBy?.LastName
+                            </div>
+                        </div>
+                        
+                        @if (campaign.StartDate.HasValue || campaign.EndDate.HasValue)
+                        {
+                            <div class="row text-muted small mt-2">
+                                @if (campaign.StartDate.HasValue)
+                                {
+                                    <div class="col-6">
+                                        <i class="bi bi-calendar-event"></i> Start: @campaign.StartDate.Value.ToString("MMM dd, yyyy")
+                                    </div>
+                                }
+                                @if (campaign.EndDate.HasValue)
+                                {
+                                    <div class="col-6">
+                                        <i class="bi bi-calendar-x"></i> End: @campaign.EndDate.Value.ToString("MMM dd, yyyy")
+                                    </div>
+                                }
+                            </div>
+                        }
+                        
+                        @if (campaign.Deadline.HasValue)
+                        {
+                            <div class="text-muted small mt-2">
+                                <i class="bi bi-alarm"></i> Deadline: @campaign.Deadline.Value.ToString("MMM dd, yyyy")
+                            </div>
+                        }
+                        
+                        @if (campaign.ReportingPeriodStart.HasValue || campaign.ReportingPeriodEnd.HasValue)
+                        {
+                            <div class="text-info small mt-2">
+                                <i class="bi bi-calendar-range"></i> 
+                                @if (campaign.ReportingPeriodStart.HasValue && campaign.ReportingPeriodEnd.HasValue)
+                                {
+                                    <span>Reporting: @campaign.ReportingPeriodStart.Value.ToString("MMM yyyy") - @campaign.ReportingPeriodEnd.Value.ToString("MMM yyyy")</span>
+                                }
+                                else if (campaign.ReportingPeriodStart.HasValue)
+                                {
+                                    <span>From: @campaign.ReportingPeriodStart.Value.ToString("MMM yyyy")</span>
+                                }
+                                else if (campaign.ReportingPeriodEnd.HasValue)
+                                {
+                                    <span>Until: @campaign.ReportingPeriodEnd.Value.ToString("MMM yyyy")</span>
+                                }
+                            </div>
+                        }
+                        
+                        <div class="mt-3">
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-list-task"></i> @campaign.Assignments.Count() assignment(s)
+                            </span>
+                            
+                            @* Show context indicator for supplier organizations *@
+                            @if (isSupplierOrg && brandingContext?.BrandingSource == ESGPlatform.Services.BrandingSource.Campaign)
+                            {
+                                <span class="badge ms-2" style="background-color: @(brandingContext.SecondaryColor); color: white;">
+                                    <i class="bi bi-eye"></i> Partner View
+                                </span>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="btn-group w-100" role="group">
+                            <a asp-action="Details" asp-route-id="@campaign.Id" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                            {
+                                <a asp-action="Edit" asp-route-id="@campaign.Id" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                <a asp-action="ManageAssignments" asp-route-id="@campaign.Id" class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-people"></i> Assignments
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@functions {
+    string GetStatusBadgeClass(ESGPlatform.Models.Entities.CampaignStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.Entities.CampaignStatus.Draft => "bg-secondary",
+            ESGPlatform.Models.Entities.CampaignStatus.Active => "bg-success",
+            ESGPlatform.Models.Entities.CampaignStatus.Paused => "bg-warning",
+            ESGPlatform.Models.Entities.CampaignStatus.Completed => "bg-primary",
+            ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+} 

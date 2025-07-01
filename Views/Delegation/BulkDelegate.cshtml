@@ -1,0 +1,403 @@
+@model ESGPlatform.Models.ViewModels.BulkDelegationViewModel
+@{
+    ViewData["Title"] = "Bulk Delegation";
+}
+
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-share-fill"></i> Bulk Delegation</h2>
+                    <p class="text-muted mb-0">Delegate multiple questions to team members</p>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-outline-primary">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Info -->
+    <div class="alert alert-info mb-4">
+        <div class="row align-items-center">
+            <div class="col">
+                <h6 class="mb-1">
+                    <i class="bi bi-clipboard-data"></i> Campaign: @Model.CampaignName
+                </h6>
+                <p class="mb-0"><strong>Questionnaire:</strong> @Model.QuestionnaireTitle</p>
+            </div>
+        </div>
+    </div>
+
+    <form asp-action="BulkDelegate" method="post">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="CampaignAssignmentId" />
+
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Questions List -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-check"></i> Select Questions to Delegate
+                        </h5>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAll()">
+                                <i class="bi bi-check-all"></i> Select All
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearAll()">
+                                <i class="bi bi-x"></i> Clear All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (Model.Questions.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th width="50">
+                                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleAll(this)" />
+                                            </th>
+                                            <th>Question</th>
+                                            
+                                            <th width="100">Type</th>
+                                            <th width="200">Delegate To</th>
+                                            <th width="250">Instructions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (int i = 0; i < Model.Questions.Count; i++)
+                                        {
+                                            <tr class="question-row" data-index="@i">
+                                                <td>
+                                                    <input type="hidden" asp-for="Questions[i].QuestionId" />
+                                                    <input type="hidden" asp-for="Questions[i].QuestionText" />
+                                                    <input type="hidden" asp-for="Questions[i].HelpText" />
+                                                    <input type="hidden" asp-for="Questions[i].QuestionType" />
+                                                    <input type="hidden" asp-for="Questions[i].IsRequired" />
+                                                    <input type="hidden" asp-for="Questions[i].DisplayOrder" />
+                                                    
+                                                    <input type="checkbox" asp-for="Questions[i].IsSelected" 
+                                                           class="question-checkbox" onchange="updateRowState(this)" />
+                                                </td>
+                                                <td>
+                                                    <div>
+                                                        <strong>@Model.Questions[i].QuestionText</strong>
+                                                        @if (Model.Questions[i].IsRequired)
+                                                        {
+                                                            <span class="badge bg-danger ms-1">Required</span>
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(Model.Questions[i].HelpText))
+                                                        {
+                                                            <br/><small class="text-muted">@Model.Questions[i].HelpText</small>
+                                                        }
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">@Model.Questions[i].QuestionType</span>
+                                                </td>
+                                                <td>
+                                                    <select asp-for="Questions[i].ToUserId" class="form-select form-select-sm delegate-select">
+                                                        <option value="">-- Select Member --</option>
+                                                        @foreach (var member in Model.TeamMembers)
+                                                        {
+                                                            <option value="@member.Id">@member.FullName</option>
+                                                        }
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <textarea asp-for="Questions[i].Instructions" 
+                                                             class="form-control form-control-sm" 
+                                                             rows="2" 
+                                                             placeholder="Optional instructions..."></textarea>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <i class="bi bi-question-circle fs-1 text-muted"></i>
+                                <h5 class="text-muted mt-3">No questions available</h5>
+                                <p class="text-muted">This questionnaire has no questions to delegate.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Global Settings -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-gear"></i> Global Settings
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Global Instructions</label>
+                            <textarea asp-for="GlobalInstructions" 
+                                     class="form-control" 
+                                     rows="4" 
+                                     placeholder="These instructions will be used for all selected questions that don't have specific instructions..."></textarea>
+                            <small class="form-text text-muted">
+                                This will be used as fallback instructions for questions without specific instructions.
+                            </small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Quick Actions</label>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="assignToAll()">
+                                    <i class="bi bi-people"></i> Assign Selected to Same Person
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="copyGlobalInstructions()">
+                                    <i class="bi bi-clipboard"></i> Copy Global Instructions
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Members -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-people"></i> Available Team Members
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.TeamMembers.Any())
+                        {
+                            @foreach (var member in Model.TeamMembers)
+                            {
+                                <div class="d-flex align-items-center mb-2 p-2 border rounded team-member" data-userid="@member.Id">
+                                    <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3">
+                                        @member.FullName.Substring(0, 1).ToUpper()
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold">@member.FullName</div>
+                                        <small class="text-muted">@member.Email</small>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-light text-dark assigned-count">0</span>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-center">
+                                <i class="bi bi-person-x fs-2 text-muted"></i>
+                                <p class="text-muted mt-2">No team members available</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clipboard-check"></i> Summary
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h4 class="text-primary mb-0" id="selectedCount">0</h4>
+                                <small class="text-muted">Selected</small>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-success mb-0" id="assignedCount">0</h4>
+                                <small class="text-muted">Assigned</small>
+                            </div>
+                        </div>
+                        
+                        <hr />
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary" id="delegateBtn" disabled>
+                                <i class="bi bi-share"></i> Create Delegations
+                            </button>
+                        </div>
+                        
+                        <small class="form-text text-muted mt-2">
+                            Select questions and assign team members to create delegations.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    updateCounts();
+});
+
+function selectAll() {
+    document.querySelectorAll('.question-checkbox').forEach(cb => {
+        cb.checked = true;
+        updateRowState(cb);
+    });
+    document.getElementById('selectAllCheckbox').checked = true;
+    updateCounts();
+}
+
+function clearAll() {
+    document.querySelectorAll('.question-checkbox').forEach(cb => {
+        cb.checked = false;
+        updateRowState(cb);
+    });
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateCounts();
+}
+
+function toggleAll(masterCheckbox) {
+    document.querySelectorAll('.question-checkbox').forEach(cb => {
+        cb.checked = masterCheckbox.checked;
+        updateRowState(cb);
+    });
+    updateCounts();
+}
+
+function updateRowState(checkbox) {
+    const row = checkbox.closest('tr');
+    const delegateSelect = row.querySelector('.delegate-select');
+    
+    if (checkbox.checked) {
+        row.classList.add('table-primary');
+        delegateSelect.disabled = false;
+    } else {
+        row.classList.remove('table-primary');
+        delegateSelect.disabled = true;
+        delegateSelect.value = '';
+    }
+    
+    updateCounts();
+}
+
+function updateCounts() {
+    const selectedCheckboxes = document.querySelectorAll('.question-checkbox:checked');
+    const assignedSelects = Array.from(selectedCheckboxes).map(cb => {
+        const row = cb.closest('tr');
+        return row.querySelector('.delegate-select');
+    }).filter(select => select.value !== '');
+    
+    const selectedCount = selectedCheckboxes.length;
+    const assignedCount = assignedSelects.length;
+    
+    document.getElementById('selectedCount').textContent = selectedCount;
+    document.getElementById('assignedCount').textContent = assignedCount;
+    
+    // Update team member assignment counts
+    document.querySelectorAll('.assigned-count').forEach(badge => badge.textContent = '0');
+    assignedSelects.forEach(select => {
+        const userId = select.value;
+        const badge = document.querySelector(`[data-userid="${userId}"] .assigned-count`);
+        if (badge) {
+            badge.textContent = parseInt(badge.textContent) + 1;
+        }
+    });
+    
+    // Enable/disable submit button
+    const delegateBtn = document.getElementById('delegateBtn');
+    delegateBtn.disabled = assignedCount === 0;
+    
+    // Update master checkbox state
+    const allCheckboxes = document.querySelectorAll('.question-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < allCheckboxes.length;
+    selectAllCheckbox.checked = selectedCount === allCheckboxes.length;
+}
+
+function assignToAll() {
+    const selectedMember = prompt('Enter team member name or select from the list:');
+    if (!selectedMember) return;
+    
+    const memberOption = Array.from(document.querySelectorAll('option')).find(opt => 
+        opt.textContent.toLowerCase().includes(selectedMember.toLowerCase())
+    );
+    
+    if (memberOption) {
+        document.querySelectorAll('.question-checkbox:checked').forEach(cb => {
+            const row = cb.closest('tr');
+            const select = row.querySelector('.delegate-select');
+            select.value = memberOption.value;
+        });
+        updateCounts();
+    } else {
+        alert('Team member not found. Please select from the available team members.');
+    }
+}
+
+function copyGlobalInstructions() {
+    const globalInstructions = document.querySelector('[name="GlobalInstructions"]').value;
+    
+    if (!globalInstructions.trim()) {
+        alert('Please enter global instructions first.');
+        return;
+    }
+    
+    const selectedRows = document.querySelectorAll('.question-checkbox:checked');
+    if (selectedRows.length === 0) {
+        alert('Please select questions first.');
+        return;
+    }
+    
+    let copiedCount = 0;
+    selectedRows.forEach(cb => {
+        const row = cb.closest('tr');
+        const instructionsTextarea = row.querySelector('textarea[name$=".Instructions"]');
+        if (instructionsTextarea && !instructionsTextarea.value.trim()) {
+            instructionsTextarea.value = globalInstructions;
+            copiedCount++;
+        }
+    });
+    
+    alert(`Copied global instructions to ${copiedCount} questions (only empty instruction fields were updated).`);
+}
+
+// Add event listeners to delegate selects
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('delegate-select')) {
+        updateCounts();
+    }
+});
+</script>
+
+<style>
+.avatar-sm {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+}
+
+.team-member {
+    transition: all 0.2s ease;
+}
+
+.team-member:hover {
+    background-color: #f8f9fa;
+}
+
+.question-row.table-primary {
+    --bs-table-accent-bg: var(--bs-primary-bg-subtle);
+}
+
+.delegate-select:disabled {
+    background-color: #e9ecef;
+}
+</style> 

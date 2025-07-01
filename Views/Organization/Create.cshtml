@@ -1,0 +1,249 @@
+@model ESGPlatform.Models.ViewModels.OrganizationViewModel
+
+@{
+    ViewData["Title"] = "Create Organization";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">@ViewData["Title"]</h3>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="Name" class="form-label required"></label>
+                                <input asp-for="Name" class="form-control" placeholder="Enter organization name" />
+                                <span asp-validation-for="Name" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="Type" class="form-label required"></label>
+                                <select asp-for="Type" class="form-select" id="organizationType">
+                                    <option value="@((int)ESGPlatform.Models.Entities.OrganizationType.PlatformOrganization)">Platform Organization</option>
+                                    <option value="@((int)ESGPlatform.Models.Entities.OrganizationType.SupplierOrganization)" selected>Supplier Organization</option>
+                                </select>
+                                <div class="form-text" id="typeDescription">Responds to questionnaires from platform organizations</div>
+                                <span asp-validation-for="Type" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="Theme" class="form-label"></label>
+                                <select asp-for="Theme" class="form-select">
+                                    <option value="Default">Default</option>
+                                    <option value="Corporate">Corporate</option>
+                                    <option value="Modern">Modern</option>
+                                    <option value="Minimal">Minimal</option>
+                                </select>
+                                <span class="text-danger" asp-validation-for="Theme"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Placeholder for future fields -->
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Description" class="form-label"></label>
+                        <textarea asp-for="Description" class="form-control" rows="3" placeholder="Enter organization description (optional)"></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="LogoUrl" class="form-label"></label>
+                        <input asp-for="LogoUrl" class="form-control" placeholder="https://example.com/logo.png" />
+                        <div class="form-text">Enter a URL to the organization's logo image</div>
+                        <span asp-validation-for="LogoUrl" class="text-danger"></span>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label asp-for="PrimaryColor" class="form-label"></label>
+                                <div class="input-group">
+                                    <input asp-for="PrimaryColor" type="color" class="form-control form-control-color" value="#007bff" />
+                                    <input asp-for="PrimaryColor" type="text" class="form-control" placeholder="#007bff" />
+                                </div>
+                                <div class="form-text">Choose the primary brand color</div>
+                                <span asp-validation-for="PrimaryColor" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label asp-for="SecondaryColor" class="form-label"></label>
+                                <div class="input-group">
+                                    <input asp-for="SecondaryColor" type="color" class="form-control form-control-color" value="#6c757d" />
+                                    <input asp-for="SecondaryColor" type="text" class="form-control" placeholder="#6c757d" />
+                                </div>
+                                <div class="form-text">Choose the secondary brand color</div>
+                                <span asp-validation-for="SecondaryColor" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label asp-for="AccentColor" class="form-label"></label>
+                                <div class="input-group">
+                                    <input asp-for="AccentColor" type="color" class="form-control form-control-color" value="#e74c3c" />
+                                    <input asp-for="AccentColor" type="text" class="form-control" placeholder="#e74c3c" />
+                                </div>
+                                <div class="form-text">Choose the accent brand color</div>
+                                <span asp-validation-for="AccentColor" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input asp-for="IsActive" class="form-check-input" type="checkbox" checked />
+                            <label asp-for="IsActive" class="form-check-label">
+                                Organization is active
+                            </label>
+                        </div>
+                        <div class="form-text">Inactive organizations cannot be used for campaigns</div>
+                    </div>
+
+                    <!-- Organization attributes are now managed via relationship-specific dynamic system -->
+                    <!-- This section will be replaced with relationship-specific attribute management in future implementation -->
+
+                    <div class="d-flex justify-content-between">
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to List
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Create Organization
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Preview</h5>
+            </div>
+            <div class="card-body">
+                <div id="preview-container" class="text-center">
+                    <div id="logo-preview" class="mb-3" style="display: none;">
+                        <img id="logo-img" src="" alt="Logo Preview" class="img-fluid" style="max-height: 80px;" />
+                    </div>
+                    <h6 id="name-preview" class="text-muted">Organization Name</h6>
+                    <p id="description-preview" class="small text-muted">Organization description will appear here</p>
+                    <div class="mt-3">
+                        <span id="primary-color-preview" class="badge me-2" style="background-color: #007bff;">Primary</span>
+                        <span id="secondary-color-preview" class="badge me-2" style="background-color: #6c757d;">Secondary</span>
+                        <span id="accent-color-preview" class="badge" style="background-color: #e74c3c;">Accent</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Help</h5>
+            </div>
+            <div class="card-body">
+                <h6>Organization Setup</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="bi bi-info-circle text-info"></i> Choose a clear, professional name</li>
+                    <li><i class="bi bi-info-circle text-info"></i> Logo should be in PNG or SVG format</li>
+                    <li><i class="bi bi-info-circle text-info"></i> Colors will be used throughout the platform</li>
+                    <li><i class="bi bi-info-circle text-info"></i> Theme affects the overall look and feel</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Live preview functionality
+            function updatePreview() {
+                var name = $('#Name').val() || 'Organization Name';
+                var description = $('#Description').val() || 'Organization description will appear here';
+                var logoUrl = $('#LogoUrl').val();
+                var primaryColor = $('#PrimaryColor').val() || '#007bff';
+                var secondaryColor = $('#SecondaryColor').val() || '#6c757d';
+                var accentColor = $('#AccentColor').val() || '#e74c3c';
+
+                $('#name-preview').text(name);
+                $('#description-preview').text(description);
+                $('#primary-color-preview').css('background-color', primaryColor);
+                $('#secondary-color-preview').css('background-color', secondaryColor);
+                $('#accent-color-preview').css('background-color', accentColor);
+
+                if (logoUrl) {
+                    $('#logo-img').attr('src', logoUrl);
+                    $('#logo-preview').show();
+                } else {
+                    $('#logo-preview').hide();
+                }
+            }
+
+            // Sync color inputs
+            $('input[type="color"]').on('input', function() {
+                var textInput = $(this).siblings('input[type="text"]');
+                textInput.val($(this).val());
+                updatePreview();
+            });
+
+            $('input[type="text"][name$="Color"]').on('input', function() {
+                var colorInput = $(this).siblings('input[type="color"]');
+                if ($(this).val().match(/^#[0-9A-Fa-f]{6}$/)) {
+                    colorInput.val($(this).val());
+                }
+                updatePreview();
+            });
+
+            // Update preview on input changes
+            $('#Name, #Description, #LogoUrl').on('input', updatePreview);
+
+            // Organization type change handler
+            $('#organizationType').on('change', function() {
+                var selectedValue = $(this).val();
+                var description = '';
+                
+                if (selectedValue == '1') { // PlatformOrganization
+                    description = 'Can create campaigns and send questionnaires to suppliers';
+                } else if (selectedValue == '2') { // SupplierOrganization
+                    description = 'Responds to questionnaires from platform organizations';
+                }
+                
+                $('#typeDescription').text(description);
+            });
+
+            // Initialize preview
+            updatePreview();
+        });
+    </script>
+}
+
+<style>
+    .required::after {
+        content: " *";
+        color: red;
+    }
+    
+    .form-control-color {
+        width: 50px;
+        height: 38px;
+    }
+    
+    #preview-container {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+</style> 

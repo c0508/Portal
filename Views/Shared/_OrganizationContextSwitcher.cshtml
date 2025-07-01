@@ -1,0 +1,111 @@
+@{
+    var brandingContext = ViewBag.BrandingContext as ESGPlatform.Services.BrandingContext;
+    var isSupplierOrg = ViewBag.IsCurrentOrgSupplierType == true;
+}
+
+@if (isSupplierOrg && User.Identity?.IsAuthenticated == true)
+{
+    <div class="card mb-3">
+        <div class="card-header">
+            <h6 class="card-title mb-0">
+                <i class="bi bi-arrow-left-right"></i> Organization Context
+            </h6>
+        </div>
+        <div class="card-body">
+            <p class="card-text small text-muted">
+                As a supplier organization, you may work with multiple platform organizations. 
+                Switch context to view campaigns and styling from different partners.
+            </p>
+            
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <label for="contextSwitcher" class="form-label">Viewing context:</label>
+                    <select id="contextSwitcher" class="form-select">
+                        <option value="">Your Organization (Default)</option>
+                        <option value="primary">Primary Partner</option>
+                        <option value="all">All Partners</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    @if (brandingContext != null && brandingContext.BrandingSource != ESGPlatform.Services.BrandingSource.System)
+                    {
+                        <div class="current-context">
+                            <strong>Current Context:</strong><br>
+                            <div class="d-flex align-items-center mt-1">
+                                @if (!string.IsNullOrEmpty(brandingContext.LogoUrl))
+                                {
+                                    <img src="@brandingContext.LogoUrl" alt="@brandingContext.OrganizationName" style="height: 24px; width: auto; margin-right: 8px;">
+                                }
+                                <span class="badge" style="background-color: @brandingContext.PrimaryColor; color: white;">
+                                    @brandingContext.OrganizationName
+                                </span>
+                            </div>
+                            <small class="text-muted">
+                                @switch (brandingContext.BrandingSource)
+                                {
+                                    case ESGPlatform.Services.BrandingSource.Campaign:
+                                        <span>Campaign: @brandingContext.CampaignName</span>
+                                        break;
+                                    case ESGPlatform.Services.BrandingSource.PrimaryRelationship:
+                                        <span>Primary Partner Branding</span>
+                                        break;
+                                    case ESGPlatform.Services.BrandingSource.Organization:
+                                        <span>Organization Branding</span>
+                                        break;
+                                }
+                            </small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="current-context">
+                            <strong>Current Context:</strong><br>
+                            <span class="badge bg-secondary">Default (Your Organization)</span>
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="switchContext()">
+                    <i class="bi bi-arrow-repeat"></i> Switch Context
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="resetContext()">
+                    <i class="bi bi-house"></i> Reset to Default
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+function switchContext() {
+    var switcher = document.getElementById('contextSwitcher');
+    var selectedValue = switcher.value;
+    
+    // This would typically make an AJAX call to switch the user's context
+    // For now, we'll just show a message
+    switch(selectedValue) {
+        case 'primary':
+            alert('Switching to primary partner context...');
+            break;
+        case 'all':
+            alert('Switching to view all partners...');
+            break;
+        default:
+            alert('Switching to your organization context...');
+            break;
+    }
+    
+    // In a real implementation, this would:
+    // 1. Make an AJAX call to update the user's context
+    // 2. Refresh the page or update the UI dynamically
+    // 3. Update the branding and available campaigns
+}
+
+function resetContext() {
+    document.getElementById('contextSwitcher').value = '';
+    alert('Context reset to your organization default.');
+    // In a real implementation, this would reset the user's context
+}
+</script> 

@@ -1,0 +1,180 @@
+@model IEnumerable<ESGPlatform.Models.ViewModels.UserManagementViewModel>
+
+@{
+    ViewData["Title"] = "Users";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>@ViewData["Title"]</h2>
+    <a asp-action="Invite" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> Invite User
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="organizationId" class="form-label">Filter by Organization</label>
+                @Html.DropDownList("organizationId", ViewBag.Organizations as SelectList, "All Organizations", new { @class = "form-select", onchange = "this.form.submit()" })
+            </div>
+            <div class="col-md-4">
+                <label for="role" class="form-label">Filter by Role</label>
+                @Html.DropDownList("role", ViewBag.Roles as SelectList, "All Roles", new { @class = "form-select", onchange = "this.form.submit()" })
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-secondary me-2">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <a asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Clear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Organization</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div>
+                                    <strong>@user.FirstName @user.LastName</strong>
+                                    @if (user.Roles.Contains("PlatformAdmin"))
+                                    {
+                                        <span class="badge bg-danger ms-1">Platform Admin</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                <a href="mailto:@user.Email">@user.Email</a>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">@user.OrganizationName</span>
+                            </td>
+                            <td>
+                                @foreach (var role in user.Roles)
+                                {
+                                    <span class="badge bg-secondary me-1">@GetRoleDisplayName(role)</span>
+                                }
+                            </td>
+                            <td>
+                                @if (user.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>@user.CreatedAt.ToString("MMM d, yyyy")</td>
+                            <td>
+                                @if (user.LastLoginAt.HasValue)
+                                {
+                                    @user.LastLoginAt.Value.ToString("MMM d, yyyy")
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Never</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a asp-action="Details" asp-route-id="@user.Id" class="btn btn-outline-primary" title="View Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    @if (!user.Roles.Contains("PlatformAdmin"))
+                                    {
+                                        <form asp-action="ToggleStatus" asp-route-id="@user.Id" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn @(user.IsActive ? "btn-outline-warning" : "btn-outline-success")" 
+                                                    title="@(user.IsActive ? "Deactivate" : "Activate")"
+                                                    onclick="return confirm('@(user.IsActive ? "Deactivate" : "Activate") this user?')">
+                                                <i class="bi @(user.IsActive ? "bi-pause" : "bi-play")"></i>
+                                            </button>
+                                        </form>
+                                        <form asp-action="ResetPassword" asp-route-id="@user.Id" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-outline-info" title="Reset Password"
+                                                    onclick="return confirm('Reset password for @user.FirstName @user.LastName?')">
+                                                <i class="bi bi-key"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="text-center py-5">
+                <i class="bi bi-people display-1 text-muted"></i>
+                <h4 class="text-muted mt-3">No Users Found</h4>
+                <p class="text-muted">
+                    @if (ViewBag.SelectedOrganizationId != null || !string.IsNullOrEmpty(ViewBag.SelectedRole as string))
+                    {
+                        <span>No users match the selected filters.</span>
+                    }
+                    else
+                    {
+                        <span>Get started by inviting your first user.</span>
+                    }
+                </p>
+                <a asp-action="Invite" class="btn btn-primary">
+                    <i class="bi bi-person-plus"></i> Invite User
+                </a>
+            </div>
+        }
+    </div>
+</div>
+
+@functions {
+    string GetRoleDisplayName(string role)
+    {
+        return role switch
+        {
+            "PlatformAdmin" => "Platform Admin",
+            "OrgAdmin" => "Org Admin",
+            "CampaignManager" => "Campaign Manager",
+            "LeadResponder" => "Lead Responder",
+            "Responder" => "Responder",
+            "Reviewer" => "Reviewer",
+            _ => role
+        };
+    }
+}
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+} 

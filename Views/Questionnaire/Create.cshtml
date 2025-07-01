@@ -1,0 +1,344 @@
+@model ESGPlatform.Models.ViewModels.QuestionnaireCreateViewModel
+
+@{
+    ViewData["Title"] = "Create Questionnaire";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-action="Index">Questionnaires</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Create New</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        Create New Questionnaire
+                    </h1>
+                    <p class="text-muted mb-0">Create a new questionnaire for your organization</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-form-text me-2"></i>
+                                Questionnaire Details
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form asp-action="Create" method="post" enctype="multipart/form-data">
+                                <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                                <!-- Import Options -->
+                                <div class="mb-4">
+                                    <h6 class="fw-bold mb-3">Question Import Options</h6>
+                                    
+                                    <!-- Copy Option -->
+                                    <div class="form-check mb-3">
+                                        <input asp-for="CopyFromExisting" class="form-check-input" type="checkbox" id="copyOption" />
+                                        <label asp-for="CopyFromExisting" class="form-check-label fw-bold">
+                                            Copy from existing questionnaire
+                                        </label>
+                                        <div class="form-text">Copy questions and structure from an existing questionnaire</div>
+                                    </div>
+
+                                    <!-- Excel Import Option -->
+                                    <div class="form-check mb-3">
+                                        <input asp-for="ImportFromExcel" class="form-check-input" type="checkbox" id="excelImportOption" />
+                                        <label asp-for="ImportFromExcel" class="form-check-label fw-bold">
+                                            Import questions from Excel
+                                        </label>
+                                        <div class="form-text">
+                                            Upload an Excel file with questions. 
+                                            <a href="@Url.Action("DownloadTemplate", "Questionnaire")" class="text-decoration-none">
+                                                <i class="bi bi-download"></i> Download Template
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Source Questionnaire Selection -->
+                                <div class="mb-3" id="sourceQuestionnaireSection" style="display: none;">
+                                    <label asp-for="SourceQuestionnaireId" class="form-label fw-bold"></label>
+                                    <select asp-for="SourceQuestionnaireId" class="form-select">
+                                        <option value="">-- Select questionnaire to copy --</option>
+                                        @foreach (var questionnaire in Model.AvailableQuestionnaires)
+                                        {
+                                            <option value="@questionnaire.Id">@questionnaire.Title (@questionnaire.Category)</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="SourceQuestionnaireId" class="text-danger"></span>
+                                    <div class="form-text">Select the questionnaire to copy from</div>
+                                </div>
+
+                                <!-- Excel File Upload -->
+                                <div class="mb-3" id="excelFileSection" style="display: none;">
+                                    <label asp-for="ExcelFile" class="form-label fw-bold"></label>
+                                    <input asp-for="ExcelFile" type="file" class="form-control" accept=".xlsx,.xls" />
+                                    <span asp-validation-for="ExcelFile" class="text-danger"></span>
+                                    <div class="form-text">
+                                        Upload an Excel file (.xlsx or .xls) with your questions. 
+                                        Make sure to follow the template format.
+                                    </div>
+                                </div>
+
+                                <!-- Preview Import Button -->
+                                <div class="mb-3" id="previewImportSection" style="display: none;">
+                                    <button type="submit" name="action" value="preview" class="btn btn-outline-primary">
+                                        <i class="bi bi-eye me-1"></i>
+                                        Preview Import
+                                    </button>
+                                    <small class="text-muted d-block mt-1">Preview questions before creating the questionnaire</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="Title" class="form-label fw-bold"></label>
+                                    <input asp-for="Title" class="form-control" placeholder="Enter questionnaire title" />
+                                    <span asp-validation-for="Title" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="Description" class="form-label fw-bold"></label>
+                                    <textarea asp-for="Description" class="form-control" rows="4" 
+                                              placeholder="Provide a detailed description of this questionnaire's purpose and scope"></textarea>
+                                    <span asp-validation-for="Description" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label asp-for="Category" class="form-label fw-bold"></label>
+                                    <select asp-for="Category" class="form-select">
+                                        <option value="">Select a category</option>
+                                        <option value="Environmental">Environmental</option>
+                                        <option value="Social">Social</option>
+                                        <option value="Governance">Governance</option>
+                                        <option value="General ESG">General ESG</option>
+                                        <option value="Due Diligence">Due Diligence</option>
+                                        <option value="Compliance">Compliance</option>
+                                        <option value="Risk Assessment">Risk Assessment</option>
+                                        <option value="Performance Metrics">Performance Metrics</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    <span asp-validation-for="Category" class="text-danger"></span>
+                                </div>
+
+                                <div class="mb-4">
+                                    <div class="form-check">
+                                        <input asp-for="IsActive" class="form-check-input" type="checkbox" />
+                                        <label asp-for="IsActive" class="form-check-label fw-bold">
+                                            Active
+                                        </label>
+                                        <div class="form-text">Active questionnaires can be used in campaigns</div>
+                                    </div>
+                                </div>
+
+                                <!-- Imported Questions Preview -->
+                                @if (Model.HasImportedQuestions)
+                                {
+                                    <div class="mb-4">
+                                        <h6 class="fw-bold mb-3">
+                                            <i class="bi bi-list-check me-2"></i>
+                                            Imported Questions Preview (@Model.ImportedQuestions.Count questions)
+                                        </h6>
+                                        
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle me-2"></i>
+                                            Review the imported questions below. Fix any validation errors before creating the questionnaire.
+                                            <br><small class="mt-1 d-block">
+                                                <strong>Note:</strong> Keep the Excel file selected when clicking "Create Questionnaire" to import these questions.
+                                            </small>
+                                        </div>
+
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Row</th>
+                                                        <th>Question</th>
+                                                        <th>Type</th>
+                                                        <th>Section</th>
+                                                        <th>Required</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var question in Model.ImportedQuestions)
+                                                    {
+                                                        <tr class="@(question.IsValid ? "" : "table-danger")">
+                                                            <td class="text-muted">@question.RowNumber</td>
+                                                            <td>
+                                                                <div class="fw-bold">@question.QuestionText</div>
+                                                                @if (!string.IsNullOrEmpty(question.HelpText))
+                                                                {
+                                                                    <small class="text-muted">@question.HelpText</small>
+                                                                }
+                                                                @if (!string.IsNullOrEmpty(question.Options))
+                                                                {
+                                                                    <div class="mt-1">
+                                                                        <small class="text-muted">Options: @question.Options</small>
+                                                                    </div>
+                                                                }
+                                                                @if (question.QuestionType == "Number")
+                                                                {
+                                                                    <div class="mt-1">
+                                                                        @if (question.IsPercentage)
+                                                                        {
+                                                                            <small class="text-primary"><i class="bi bi-percent me-1"></i>Percentage question</small>
+                                                                        }
+                                                                        else if (!string.IsNullOrEmpty(question.Unit))
+                                                                        {
+                                                                            <small class="text-info"><i class="bi bi-calculator me-1"></i>Unit: @question.Unit</small>
+                                                                        }
+                                                                    </div>
+                                                                }
+                                                            </td>
+                                                            <td><span class="badge bg-info">@question.QuestionType</span></td>
+                                                            <td>@(question.Section ?? "Other")</td>
+                                                            <td>
+                                                                @if (question.IsRequired)
+                                                                {
+                                                                    <i class="bi bi-check-circle text-success"></i>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <i class="bi bi-circle text-muted"></i>
+                                                                }
+                                                            </td>
+                                                            <td>
+                                                                @if (question.IsValid)
+                                                                {
+                                                                    <span class="badge bg-success">Valid</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="badge bg-danger">Errors</span>
+                                                                    <div class="mt-1">
+                                                                        @foreach (var error in question.ValidationErrors)
+                                                                        {
+                                                                            <small class="text-danger d-block">• @error</small>
+                                                                        }
+                                                                    </div>
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit" name="action" value="create" class="btn btn-primary">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Create Questionnaire
+                                    </button>
+                                    <a asp-action="Index" class="btn btn-outline-secondary">
+                                        <i class="bi bi-arrow-left me-1"></i>
+                                        Cancel
+                                    </a>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <h6 class="card-title mb-0">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Getting Started
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6 class="fw-bold">Next Steps</h6>
+                                <ol class="small text-muted mb-0">
+                                    <li>Create your questionnaire</li>
+                                    <li>Add questions to build your form</li>
+                                    <li>Configure question types and validation</li>
+                                    <li>Test with preview mode</li>
+                                    <li>Use in campaigns</li>
+                                </ol>
+                            </div>
+
+                            <div class="mb-3">
+                                <h6 class="fw-bold">Categories</h6>
+                                <ul class="small text-muted mb-0">
+                                    <li><strong>Environmental:</strong> Carbon footprint, waste, energy</li>
+                                    <li><strong>Social:</strong> Labor practices, community impact</li>
+                                    <li><strong>Governance:</strong> Board structure, ethics, compliance</li>
+                                </ul>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <small>
+                                    <i class="bi bi-lightbulb me-1"></i>
+                                    <strong>Tip:</strong> Choose a descriptive title and category to help organize your questionnaires effectively.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const copyCheckbox = document.getElementById('copyOption');
+            const excelImportCheckbox = document.getElementById('excelImportOption');
+            const sourceSection = document.getElementById('sourceQuestionnaireSection');
+            const excelFileSection = document.getElementById('excelFileSection');
+            const previewImportSection = document.getElementById('previewImportSection');
+
+            function updateSections() {
+                // Handle copy option
+                if (copyCheckbox.checked) {
+                    sourceSection.style.display = 'block';
+                    // Uncheck Excel import if copy is selected
+                    excelImportCheckbox.checked = false;
+                    excelFileSection.style.display = 'none';
+                    previewImportSection.style.display = 'none';
+                } else {
+                    sourceSection.style.display = 'none';
+                    document.getElementById('SourceQuestionnaireId').value = '';
+                }
+
+                // Handle Excel import option
+                if (excelImportCheckbox.checked) {
+                    excelFileSection.style.display = 'block';
+                    previewImportSection.style.display = 'block';
+                    // Uncheck copy option if Excel import is selected
+                    copyCheckbox.checked = false;
+                    sourceSection.style.display = 'none';
+                    document.getElementById('SourceQuestionnaireId').value = '';
+                } else {
+                    excelFileSection.style.display = 'none';
+                    previewImportSection.style.display = 'none';
+                    if (document.getElementById('ExcelFile')) {
+                        document.getElementById('ExcelFile').value = '';
+                    }
+                }
+            }
+
+            copyCheckbox.addEventListener('change', updateSections);
+            excelImportCheckbox.addEventListener('change', updateSections);
+
+            // Initialize on page load
+            updateSections();
+        });
+    </script>
+} 

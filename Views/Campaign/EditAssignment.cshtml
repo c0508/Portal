@@ -1,0 +1,186 @@
+@model ESGPlatform.Models.ViewModels.CampaignAssignmentEditViewModel
+
+@{
+    ViewData["Title"] = "Edit Assignment";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="bi bi-pencil-square"></i> Edit Campaign Assignment</h3>
+                <p class="text-muted mb-0">Campaign: <strong>@Model.CampaignName</strong></p>
+            </div>
+            <div class="card-body">
+                <form asp-action="EditAssignment" method="post">
+                    <input asp-for="Id" type="hidden" />
+                    <input asp-for="CampaignId" type="hidden" />
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="TargetOrganizationId" class="form-label"></label>
+                            <select asp-for="TargetOrganizationId" class="form-select">
+                                <option value="">-- Select Organization --</option>
+                                @foreach (var org in Model.AvailableOrganizations)
+                                {
+                                    <option value="@org.Id" selected="@(org.Id == Model.TargetOrganizationId)">@org.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="TargetOrganizationId" class="text-danger"></span>
+                            <div class="form-text">The organization that will complete this questionnaire.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="QuestionnaireVersionId" class="form-label"></label>
+                            <select asp-for="QuestionnaireVersionId" class="form-select">
+                                <option value="">-- Select Questionnaire Version --</option>
+                                @foreach (var version in Model.AvailableQuestionnaireVersions)
+                                {
+                                    <option value="@version.Id" selected="@(version.Id == Model.QuestionnaireVersionId)">@version.DisplayText</option>
+                                }
+                            </select>
+                            <span asp-validation-for="QuestionnaireVersionId" class="text-danger"></span>
+                            <div class="form-text">The specific questionnaire version to be completed.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="LeadResponderId" class="form-label"></label>
+                            <select asp-for="LeadResponderId" class="form-select">
+                                <option value="">-- Select Lead Responder (Optional) --</option>
+                                @foreach (var user in Model.AvailableLeadResponders)
+                                {
+                                    <option value="@user.Id" selected="@(user.Id == Model.LeadResponderId)">@user.DisplayName (@user.Email)</option>
+                                }
+                            </select>
+                            <span asp-validation-for="LeadResponderId" class="text-danger"></span>
+                            <div class="form-text">The primary person responsible for completing this assignment.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Status" class="form-label"></label>
+                            <select asp-for="Status" class="form-select">
+                                <option value="NotStarted" selected="@(Model.Status == ESGPlatform.Models.Entities.AssignmentStatus.NotStarted)">Not Started</option>
+                                <option value="InProgress" selected="@(Model.Status == ESGPlatform.Models.Entities.AssignmentStatus.InProgress)">In Progress</option>
+                                <option value="Submitted" selected="@(Model.Status == ESGPlatform.Models.Entities.AssignmentStatus.Submitted)">Submitted</option>
+                                <option value="UnderReview" selected="@(Model.Status == ESGPlatform.Models.Entities.AssignmentStatus.UnderReview)">Under Review</option>
+                                <option value="Approved" selected="@(Model.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved)">Approved</option>
+                                <option value="ChangesRequested" selected="@(Model.Status == ESGPlatform.Models.Entities.AssignmentStatus.ChangesRequested)">Changes Requested</option>
+                            </select>
+                            <span asp-validation-for="Status" class="text-danger"></span>
+                            <div class="form-text">Current status of this assignment.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="ReviewNotes" class="form-label"></label>
+                            <textarea asp-for="ReviewNotes" class="form-control" rows="4" placeholder="Add any review notes or comments..."></textarea>
+                            <span asp-validation-for="ReviewNotes" class="text-danger"></span>
+                            <div class="form-text">Internal notes about this assignment's review or status.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a asp-action="ManageAssignments" asp-route-id="@Model.CampaignId" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Assignments
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Update Assignment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Assignment Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6>Status Meanings</h6>
+                    <ul class="mb-0">
+                        <li><strong>Not Started:</strong> Assignment has been created but work hasn't begun</li>
+                        <li><strong>In Progress:</strong> Work is currently underway</li>
+                        <li><strong>Submitted:</strong> All questions have been answered and submitted</li>
+                        <li><strong>Under Review:</strong> Submitted and awaiting review</li>
+                        <li><strong>Approved:</strong> Review completed and approved</li>
+                        <li><strong>Changes Requested:</strong> Review completed but needs changes</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Important:</h6>
+                    <ul class="mb-0">
+                        <li>Changing the organization will reset lead responder selection</li>
+                        <li>Status changes affect workflow and notifications</li>
+                        <li>Review notes are visible to organization users</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        // Auto-load lead responders when organization is selected
+        document.getElementById('TargetOrganizationId').addEventListener('change', function() {
+            var orgId = this.value;
+            var leadResponderSelect = document.getElementById('LeadResponderId');
+            var currentLeadResponderId = '@Model.LeadResponderId';
+            
+            // Clear existing options
+            leadResponderSelect.innerHTML = '<option value="">-- Select Lead Responder (Optional) --</option>';
+            
+            if (orgId) {
+                // Show loading state
+                leadResponderSelect.innerHTML += '<option value="">Loading users...</option>';
+                
+                // Make AJAX call to get users for the selected organization
+                fetch(`/Campaign/GetUsersByOrganization?organizationId=${orgId}`)
+                    .then(response => response.json())
+                    .then(users => {
+                        // Clear loading message
+                        leadResponderSelect.innerHTML = '<option value="">-- Select Lead Responder (Optional) --</option>';
+                        
+                        // Add users to dropdown
+                        users.forEach(user => {
+                            var option = document.createElement('option');
+                            option.value = user.id;
+                            option.textContent = `${user.displayName} (${user.email})`;
+                            // Maintain selection if this was the previously selected user
+                            if (user.id === currentLeadResponderId) {
+                                option.selected = true;
+                            }
+                            leadResponderSelect.appendChild(option);
+                        });
+                        
+                        // If no users found, show message
+                        if (users.length === 0) {
+                            var option = document.createElement('option');
+                            option.value = '';
+                            option.textContent = 'No users found in this organization';
+                            option.disabled = true;
+                            leadResponderSelect.appendChild(option);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading users:', error);
+                        leadResponderSelect.innerHTML = '<option value="">-- Select Lead Responder (Optional) --</option><option value="" disabled>Error loading users</option>';
+                    });
+            }
+        });
+    </script>
+} 

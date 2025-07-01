@@ -1,0 +1,382 @@
+@model ESGPlatform.Models.ViewModels.DelegationSummaryViewModel
+@{
+    ViewData["Title"] = "Delegation Details";
+}
+
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-info-circle"></i> Delegation Details</h2>
+                    <p class="text-muted mb-0">Detailed information about this delegation</p>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                    <a asp-action="History" class="btn btn-outline-secondary">
+                        <i class="bi bi-list"></i> History
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Delegation Info -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-question-circle"></i> Question Details
+                    </h5>
+                    <span class="badge @GetStatusBadgeClass(Model.Status) fs-6">
+                        @Model.Status
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Question:</label>
+                        <p class="fs-6">@Model.QuestionText</p>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Campaign:</label>
+                            <p>@Model.CampaignName</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Questionnaire:</label>
+                            <p>@Model.QuestionnaireTitle</p>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.Instructions))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Instructions:</label>
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                @Model.Instructions
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.HasResponse && !string.IsNullOrEmpty(Model.ResponseSummary))
+                    {
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Response:</label>
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i>
+                                <strong>Answer provided:</strong> @Model.ResponseSummary
+                            </div>
+                        </div>
+                    }
+                    else if (Model.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-clock"></i>
+                            This question has not been answered yet.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-gear"></i> Actions</h6>
+                </div>
+                <div class="card-body">
+                    @if (Model.ToUserId == ViewContext.HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
+                    {
+                        <!-- Actions for delegation recipient -->
+                        @if (Model.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                        {
+                            <div class="d-flex gap-2 mb-3">
+                                <a asp-controller="Response" asp-action="AnswerQuestionnaire" asp-route-id="@Model.CampaignAssignmentId" 
+                                   class="btn btn-primary">
+                                    <i class="bi bi-pencil"></i> Answer Question
+                                </a>
+                                @if (Model.HasResponse)
+                                {
+                                    <form asp-action="Complete" asp-route-id="@Model.Id" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-success">
+                                            <i class="bi bi-check"></i> Mark as Complete
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                            
+                            @if (!Model.HasResponse)
+                            {
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i>
+                                    You need to provide an answer to the question before marking this delegation as complete.
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i>
+                                This delegation has been completed.
+                            </div>
+                        }
+                    }
+                    else if (Model.FromUserId == ViewContext.HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value)
+                    {
+                        <!-- Actions for delegation creator -->
+                        @if (Model.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                        {
+                            <div class="d-flex gap-2 mb-3">
+                                <a asp-controller="Response" asp-action="AnswerQuestionnaire" asp-route-id="@Model.CampaignAssignmentId" 
+                                   class="btn btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View Question
+                                </a>
+                                <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-danger"
+                                            onclick="return confirm('Are you sure you want to cancel this delegation?')">
+                                        <i class="bi bi-x"></i> Cancel Delegation
+                                    </button>
+                                </form>
+                            </div>
+                            
+                            @if (Model.HasResponse)
+                            {
+                                <div class="alert alert-success">
+                                    <i class="bi bi-check-circle"></i>
+                                    The delegated user has provided an answer. The delegation can be marked as complete.
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-clock"></i>
+                                    Waiting for @Model.ToUserName to provide an answer.
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                This delegation has been @Model.Status.ToString().ToLower().
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar with timeline and metadata -->
+        <div class="col-lg-4">
+            <!-- Status and Timing -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-clock"></i> Timeline</h6>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-primary">
+                                <i class="bi bi-plus text-white"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">Delegation Created</h6>
+                                <p class="text-muted small mb-1">
+                                    @Model.CreatedAt.ToString("MMM dd, yyyy 'at' h:mm tt")
+                                </p>
+                                <p class="small mb-0">
+                                    <strong>@Model.FromUserName</strong> delegated this question to <strong>@Model.ToUserName</strong>
+                                </p>
+                            </div>
+                        </div>
+
+                        @if (Model.HasResponse)
+                        {
+                            <div class="timeline-item">
+                                <div class="timeline-marker bg-info">
+                                    <i class="bi bi-pencil text-white"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <h6 class="mb-1">Answer Provided</h6>
+                                    <p class="small mb-0">
+                                        <strong>@Model.ToUserName</strong> provided an answer to the question
+                                    </p>
+                                </div>
+                            </div>
+                        }
+
+                        @if (Model.CompletedAt.HasValue)
+                        {
+                            <div class="timeline-item">
+                                <div class="timeline-marker bg-success">
+                                    <i class="bi bi-check text-white"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <h6 class="mb-1">Delegation Completed</h6>
+                                    <p class="text-muted small mb-1">
+                                        @Model.CompletedAt.Value.ToString("MMM dd, yyyy 'at' h:mm tt")
+                                    </p>
+                                    <p class="small mb-0">
+                                        Delegation marked as complete
+                                    </p>
+                                </div>
+                            </div>
+                        }
+
+                        @if (!Model.IsActive && !Model.CompletedAt.HasValue)
+                        {
+                            <div class="timeline-item">
+                                <div class="timeline-marker bg-secondary">
+                                    <i class="bi bi-x text-white"></i>
+                                </div>
+                                <div class="timeline-content">
+                                    <h6 class="mb-1">Delegation Cancelled</h6>
+                                    <p class="small mb-0">
+                                        This delegation was cancelled
+                                    </p>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Participants -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-people"></i> Participants</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">@Model.FromUserName</h6>
+                            <small class="text-muted">Delegator (From)</small>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mb-3">
+                        <i class="bi bi-arrow-down text-muted"></i>
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="avatar-sm bg-success text-white rounded-circle d-flex align-items-center justify-content-center me-3">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">@Model.ToUserName</h6>
+                            <small class="text-muted">Assignee (To)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deadline Info -->
+            @if (Model.Deadline.HasValue)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-calendar-event"></i> Deadline
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center">
+                            <h4 class="@(Model.IsOverdue ? "text-danger" : "text-primary")">
+                                @Model.Deadline.Value.ToString("MMM dd, yyyy")
+                            </h4>
+                            @if (Model.IsOverdue)
+                            {
+                                <p class="text-danger mb-0">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    Overdue by @((DateTime.Now - Model.Deadline.Value).Days) days
+                                </p>
+                            }
+                            else if (Model.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                            {
+                                <p class="text-muted mb-0">
+                                    @Model.DaysRemaining days remaining
+                                </p>
+                            }
+                            else
+                            {
+                                <p class="text-success mb-0">
+                                    <i class="bi bi-check-circle"></i>
+                                    Completed on time
+                                </p>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -23px;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-content {
+    margin-left: 15px;
+}
+
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+}
+</style>
+
+@functions {
+    string GetStatusBadgeClass(ESGPlatform.Models.ViewModels.DelegationStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.ViewModels.DelegationStatus.Pending => "bg-warning",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Completed => "bg-success",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Overdue => "bg-danger",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Cancelled => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+} 

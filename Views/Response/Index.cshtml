@@ -1,0 +1,313 @@
+@model ESGPlatform.Models.ViewModels.AssignmentDashboardViewModel
+@using ESGPlatform.Models.Entities
+
+@{
+    ViewData["Title"] = "My Assignments";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-clipboard-check"></i> My Assignments</h2>
+                <div class="text-muted">
+                    <small>Last updated: @DateTime.Now.ToString("MMM dd, yyyy - HH:mm")</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.MyAssignments.Any() && !Model.DelegatedToMe.Any() && !Model.QuestionAssignmentsToMe.Any())
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <h4 class="text-muted mt-3">No assignments yet</h4>
+                    <p class="text-muted">When you receive questionnaire assignments or delegations, they will appear here.</p>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <!-- My Lead Assignments -->
+            @if (Model.MyAssignments.Any())
+            {
+                <div class="col-lg-8 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-person-check"></i> My Lead Assignments (@Model.MyAssignments.Count)</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Campaign</th>
+                                            <th>Questionnaire</th>
+                                            <th>Status</th>
+                                            <th>Progress</th>
+                                            <th>Deadline</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var assignment in Model.MyAssignments.OrderBy(a => a.Deadline).ThenByDescending(a => a.CreatedAt))
+                                        {
+                                            <tr class="@(assignment.IsOverdue ? "table-danger" : "")">
+                                                <td>
+                                                    <strong>@assignment.CampaignName</strong>
+                                                    <br>
+                                                    <small class="text-muted">@assignment.OrganizationName</small>
+                                                </td>
+                                                <td>
+                                                    @assignment.QuestionnaireTitle
+                                                    <br>
+                                                    <small class="text-muted">v@assignment.VersionNumber</small>
+                                                </td>
+                                                <td>
+                                                    @switch (assignment.Status)
+                                                    {
+                                                        case AssignmentStatus.NotStarted:
+                                                            <span class="badge bg-secondary">Not Started</span>
+                                                            break;
+                                                        case AssignmentStatus.InProgress:
+                                                            <span class="badge bg-primary">In Progress</span>
+                                                            break;
+                                                        case AssignmentStatus.Submitted:
+                                                            <span class="badge bg-success">Submitted</span>
+                                                            break;
+                                                        case AssignmentStatus.UnderReview:
+                                                            <span class="badge bg-warning">Under Review</span>
+                                                            break;
+                                                        case AssignmentStatus.Approved:
+                                                            <span class="badge bg-success">Approved</span>
+                                                            break;
+                                                        case AssignmentStatus.ChangesRequested:
+                                                            <span class="badge bg-danger">Changes Requested</span>
+                                                            break;
+                                                    }
+                                                    @if (assignment.IsOverdue)
+                                                    {
+                                                        <br><small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Overdue</small>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                                            <div class="progress-bar @(assignment.ProgressPercentage == 100 ? "bg-success" : "bg-primary")" 
+                                                                 style="width: @assignment.ProgressPercentage%"></div>
+                                                        </div>
+                                                        <small class="text-muted">@assignment.AnsweredQuestions/@assignment.TotalQuestions</small>
+                                                    </div>
+                                                    <small class="text-muted">@assignment.ProgressPercentage% complete</small>
+                                                </td>
+                                                <td>
+                                                    @if (assignment.Deadline.HasValue)
+                                                    {
+                                                        <span class="@(assignment.IsOverdue ? "text-danger" : "")">
+                                                            @assignment.Deadline.Value.ToString("MMM dd, yyyy")
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">No deadline</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (assignment.Status == AssignmentStatus.Submitted || assignment.Status == AssignmentStatus.UnderReview || assignment.Status == AssignmentStatus.Approved)
+                                                    {
+                                                        <a asp-action="AnswerQuestionnaire" asp-route-id="@assignment.AssignmentId" class="btn btn-sm btn-outline-primary">
+                                                            <i class="bi bi-eye"></i> View
+                                                        </a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <a asp-action="AnswerQuestionnaire" asp-route-id="@assignment.AssignmentId" class="btn btn-sm btn-primary">
+                                                            <i class="bi bi-pencil"></i> @(assignment.Status == AssignmentStatus.NotStarted ? "Start" : "Continue")
+                                                        </a>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Delegated to Me -->
+            @if (Model.DelegatedToMe.Any())
+            {
+                <div class="col-lg-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-share"></i> Delegated to Me (@Model.DelegatedToMe.Count)</h5>
+                        </div>
+                        <div class="card-body">
+                            @foreach (var delegation in Model.DelegatedToMe.OrderBy(d => d.Deadline).ThenByDescending(d => d.CreatedAt))
+                            {
+                                <div class="card mb-3 @(delegation.IsOverdue ? "border-danger" : "")">
+                                    <div class="card-body p-3">
+                                        <h6 class="card-title mb-1">@delegation.CampaignName</h6>
+                                        <p class="card-text text-muted small mb-2">
+                                            Delegated by: <strong>@delegation.DelegatedBy</strong>
+                                        </p>
+                                        @if (!string.IsNullOrEmpty(delegation.DelegationInstructions))
+                                        {
+                                            <p class="card-text small">
+                                                <em>"@delegation.DelegationInstructions"</em>
+                                            </p>
+                                        }
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            @if (delegation.AnsweredQuestions == delegation.TotalQuestions && delegation.TotalQuestions > 0)
+                                            {
+                                                <span class="badge bg-success">Completed</span>
+                                            }
+                                            else if (delegation.AnsweredQuestions > 0)
+                                            {
+                                                <span class="badge bg-info">In Progress</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning">Pending</span>
+                                            }
+                                            <a asp-action="AnswerQuestionnaire" asp-route-id="@delegation.AssignmentId" class="btn btn-sm btn-outline-primary">
+                                                @(delegation.AnsweredQuestions == delegation.TotalQuestions && delegation.TotalQuestions > 0 ? "Review" : "Answer")
+                                            </a>
+                                        </div>
+                                        @if (delegation.Deadline.HasValue)
+                                        {
+                                            <small class="text-muted d-block mt-2">
+                                                Due: @delegation.Deadline.Value.ToString("MMM dd")
+                                                @if (delegation.IsOverdue)
+                                                {
+                                                    <span class="text-danger"> (Overdue)</span>
+                                                }
+                                            </small>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Question Assignments to Me -->
+            @if (Model.QuestionAssignmentsToMe.Any())
+            {
+                <div class="col-lg-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-person-check"></i> Assigned Questions (@Model.QuestionAssignmentsToMe.Count)</h5>
+                        </div>
+                        <div class="card-body">
+                            @foreach (var assignment in Model.QuestionAssignmentsToMe.OrderBy(a => a.Deadline).ThenByDescending(a => a.CreatedAt))
+                            {
+                                <div class="card mb-3 @(assignment.IsOverdue ? "border-danger" : "")">
+                                    <div class="card-body p-3">
+                                        <h6 class="card-title mb-1">@assignment.CampaignName</h6>
+                                        <p class="card-text text-muted small mb-2">
+                                            <i class="bi bi-building"></i> @assignment.OrganizationName
+                                        </p>
+                                        <p class="card-text text-muted small mb-2">
+                                            @assignment.QuestionnaireTitle v@assignment.VersionNumber
+                                        </p>
+                                        @if (!string.IsNullOrEmpty(assignment.DelegationInstructions))
+                                        {
+                                            <p class="card-text small">
+                                                <em>"@assignment.DelegationInstructions"</em>
+                                            </p>
+                                        }
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            @if (assignment.AnsweredQuestions == assignment.TotalQuestions && assignment.TotalQuestions > 0)
+                                            {
+                                                <span class="badge bg-success">Completed</span>
+                                            }
+                                            else if (assignment.AnsweredQuestions > 0)
+                                            {
+                                                <span class="badge bg-info">In Progress</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning">Pending</span>
+                                            }
+                                            <a asp-action="AnswerQuestionnaire" asp-route-id="@assignment.AssignmentId" class="btn btn-sm btn-outline-primary">
+                                                @(assignment.AnsweredQuestions == assignment.TotalQuestions && assignment.TotalQuestions > 0 ? "Review" : "Answer")
+                                            </a>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-list-ul"></i> @assignment.TotalQuestions question@(assignment.TotalQuestions == 1 ? "" : "s") assigned
+                                            </small>
+                                        </div>
+                                        @if (assignment.Deadline.HasValue)
+                                        {
+                                            <small class="text-muted d-block mt-1">
+                                                Due: @assignment.Deadline.Value.ToString("MMM dd")
+                                                @if (assignment.IsOverdue)
+                                                {
+                                                    <span class="text-danger"> (Overdue)</span>
+                                                }
+                                            </small>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">@Model.MyAssignments.Count</h5>
+                        <p class="card-text">Lead Assignments</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-warning">@Model.MyAssignments.Count(a => a.Status == AssignmentStatus.InProgress)</h5>
+                        <p class="card-text">In Progress</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">@Model.MyAssignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved)</h5>
+                        <p class="card-text">Completed</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-danger">@Model.MyAssignments.Count(a => a.IsOverdue)</h5>
+                        <p class="card-text">Overdue</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Auto-refresh every 5 minutes
+        setTimeout(function() {
+            location.reload();
+        }, 300000);
+    </script>
+} 

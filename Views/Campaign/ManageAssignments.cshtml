@@ -1,0 +1,226 @@
+@model ESGPlatform.Models.Entities.Campaign
+
+@{
+    ViewData["Title"] = "Manage Assignments - " + Model.Name;
+}
+
+@Html.AntiForgeryToken()
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-people"></i> Manage Assignments</h1>
+        <p class="text-muted mb-0">Campaign: <strong>@Model.Name</strong></p>
+    </div>
+    @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+    {
+        <div class="btn-group" role="group">
+            <a asp-action="CreateAssignment" asp-route-campaignId="@Model.Id" class="btn btn-outline-primary">
+                <i class="bi bi-plus-circle"></i> Add Assignment
+            </a>
+            <a asp-action="BulkAssignment" asp-route-campaignId="@Model.Id" class="btn btn-primary">
+                <i class="bi bi-people-fill"></i> Bulk Assignment
+            </a>
+        </div>
+    }
+</div>
+
+@if (!Model.Assignments.Any())
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        <strong>No assignments yet.</strong>
+        @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+        {
+            <span>Click "Add Assignment" to assign questionnaires to organizations for completion.</span>
+        }
+    </div>
+    
+    <div class="card">
+        <div class="card-body text-center">
+            <i class="bi bi-list-task display-1 text-muted"></i>
+            <h4 class="mt-3">Get Started with Assignments</h4>
+            <p class="text-muted">Assignments link questionnaires to organizations, allowing them to complete ESG assessments.</p>
+            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+            {
+                <div class="d-flex gap-2 justify-content-center">
+                    <a asp-action="CreateAssignment" asp-route-campaignId="@Model.Id" class="btn btn-outline-primary">
+                        <i class="bi bi-plus-circle"></i> Single Assignment
+                    </a>
+                    <a asp-action="BulkAssignment" asp-route-campaignId="@Model.Id" class="btn btn-primary">
+                        <i class="bi bi-people-fill"></i> Bulk Assignment
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        @foreach (var assignment in Model.Assignments)
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">
+                            <i class="bi bi-building"></i> @assignment.TargetOrganization?.Name
+                        </h6>
+                        <span class="badge @GetAssignmentStatusBadgeClass(assignment.Status)">
+                            @assignment.Status
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Questionnaire:</strong>
+                            <p class="mb-1">@assignment.QuestionnaireVersion?.Questionnaire?.Title</p>
+                            <small class="text-muted">Version @assignment.QuestionnaireVersion?.VersionNumber</small>
+                        </div>
+                        
+                        @if (assignment.LeadResponder != null)
+                        {
+                            <div class="mb-3">
+                                <strong>Lead Responder:</strong>
+                                <p class="mb-0">
+                                    <i class="bi bi-person"></i> @assignment.LeadResponder.FirstName @assignment.LeadResponder.LastName
+                                </p>
+                                <small class="text-muted">@assignment.LeadResponder.Email</small>
+                            </div>
+                        }
+                        
+                        <div class="row text-muted small">
+                            <div class="col-12">
+                                <i class="bi bi-calendar-plus"></i> Created: @assignment.CreatedAt.ToString("MMM dd, yyyy")
+                            </div>
+                            @if (assignment.StartedAt.HasValue)
+                            {
+                                <div class="col-12 mt-1">
+                                    <i class="bi bi-play-circle"></i> Started: @assignment.StartedAt.Value.ToString("MMM dd, yyyy")
+                                </div>
+                            }
+                            @if (assignment.SubmittedAt.HasValue)
+                            {
+                                <div class="col-12 mt-1">
+                                    <i class="bi bi-check-circle"></i> Submitted: @assignment.SubmittedAt.Value.ToString("MMM dd, yyyy")
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="btn-group w-100" role="group">
+                            <a asp-action="ViewAssignment" asp-route-id="@assignment.Id" class="btn btn-outline-primary btn-sm" title="View Responses">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                            {
+                                <a asp-controller="QuestionAssignment" asp-action="Manage" asp-route-id="@assignment.Id"
+                                   class="btn btn-outline-success btn-sm" title="Manage Question Assignments">
+                                    <i class="bi bi-person-plus"></i> Questions
+                                </a>
+                                <a asp-action="EditAssignment" asp-route-id="@assignment.Id" class="btn btn-outline-secondary btn-sm" title="Edit Assignment">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                                <button type="button" class="btn btn-outline-danger btn-sm" title="Delete Assignment" 
+                                        onclick="deleteAssignment(@assignment.Id, '@assignment.TargetOrganization?.Name')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    
+    <!-- Assignment Summary -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5><i class="bi bi-graph-up"></i> Assignment Summary</h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-2">
+                    <h4 class="text-primary">@Model.Assignments.Count()</h4>
+                    <small class="text-muted">Total</small>
+                </div>
+                <div class="col-md-2">
+                    <h4 class="text-secondary">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.NotStarted)</h4>
+                    <small class="text-muted">Not Started</small>
+                </div>
+                <div class="col-md-2">
+                    <h4 class="text-warning">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.InProgress)</h4>
+                    <small class="text-muted">In Progress</small>
+                </div>
+                <div class="col-md-2">
+                    <h4 class="text-info">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Submitted)</h4>
+                    <small class="text-muted">Submitted</small>
+                </div>
+                <div class="col-md-2">
+                    <h4 class="text-primary">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.UnderReview)</h4>
+                    <small class="text-muted">Under Review</small>
+                </div>
+                <div class="col-md-2">
+                    <h4 class="text-success">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved)</h4>
+                    <small class="text-muted">Approved</small>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="mt-4">
+    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Campaign Details
+    </a>
+    <a asp-action="Index" class="btn btn-outline-secondary">
+        <i class="bi bi-list"></i> All Campaigns
+    </a>
+</div>
+
+@section Scripts {
+    <script>
+        function deleteAssignment(assignmentId, organizationName) {
+            if (confirm(`Are you sure you want to delete the assignment for "${organizationName}"?\n\nThis action cannot be undone.`)) {
+                // Create a form and submit it
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '@Url.Action("DeleteAssignment", "Campaign")';
+                
+                // Add CSRF token
+                const token = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (token) {
+                    const csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = '__RequestVerificationToken';
+                    csrfInput.value = token.value;
+                    form.appendChild(csrfInput);
+                }
+                
+                // Add assignment ID
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'id';
+                idInput.value = assignmentId;
+                form.appendChild(idInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+}
+
+@functions {
+    string GetAssignmentStatusBadgeClass(ESGPlatform.Models.Entities.AssignmentStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.Entities.AssignmentStatus.NotStarted => "bg-secondary",
+            ESGPlatform.Models.Entities.AssignmentStatus.InProgress => "bg-warning",
+            ESGPlatform.Models.Entities.AssignmentStatus.Submitted => "bg-info",
+            ESGPlatform.Models.Entities.AssignmentStatus.UnderReview => "bg-primary",
+            ESGPlatform.Models.Entities.AssignmentStatus.Approved => "bg-success",
+            ESGPlatform.Models.Entities.AssignmentStatus.ChangesRequested => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+} 

@@ -1,0 +1,301 @@
+@model ESGPlatform.Models.ViewModels.AssignmentProgressViewModel
+@{
+    ViewData["Title"] = "Assignment Progress";
+}
+
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-graph-up"></i> Assignment Progress</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Campaign" asp-action="Index">Campaigns</a></li>
+                    <li class="breadcrumb-item"><a asp-controller="Campaign" asp-action="Details" asp-route-id="@Model.CampaignAssignmentId">@Model.CampaignName</a></li>
+                    <li class="breadcrumb-item"><a asp-controller="QuestionAssignment" asp-action="Manage" asp-route-id="@Model.CampaignAssignmentId">Question Assignments</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Progress</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <a asp-controller="QuestionAssignment" asp-action="Manage" asp-route-id="@Model.CampaignAssignmentId" 
+               class="btn btn-outline-primary">
+                <i class="bi bi-person-plus"></i> Manage Assignments
+            </a>
+        </div>
+    </div>
+
+    <!-- Campaign Information -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-12">
+                    <h5><i class="bi bi-building"></i> @Model.TargetOrganizationName</h5>
+                    <p class="text-muted mb-0">Campaign: @Model.CampaignName</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overall Progress -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>@Model.TotalQuestions</h3>
+                    <p class="mb-0">Total Questions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>@Model.AssignedQuestions</h3>
+                    <p class="mb-0">Assigned</p>
+                    <small>@Model.AssignmentProgress.ToString("F1")% of total</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>@Model.CompletedQuestions</h3>
+                    <p class="mb-0">Completed</p>
+                    <small>@Model.CompletionProgress.ToString("F1")% of assigned</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h3>@(Model.AssignedQuestions - Model.CompletedQuestions)</h3>
+                    <p class="mb-0">Remaining</p>
+                    <small>Questions to complete</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Charts -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-pie-chart"></i> Assignment Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 30px;">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: @Model.AssignmentProgress.ToString("F1")%;" 
+                             aria-valuenow="@Model.AssignmentProgress" aria-valuemin="0" aria-valuemax="100">
+                            @Model.AssignmentProgress.ToString("F1")% Assigned
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0">@Model.AssignedQuestions out of @Model.TotalQuestions questions have been assigned to users.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-check-circle"></i> Completion Progress</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 30px;">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: @Model.CompletionProgress.ToString("F1")%;" 
+                             aria-valuenow="@Model.CompletionProgress" aria-valuemin="0" aria-valuemax="100">
+                            @Model.CompletionProgress.ToString("F1")% Complete
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0">@Model.CompletedQuestions out of @Model.AssignedQuestions assigned questions have been completed.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- User Progress -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-people"></i> User Progress</h5>
+                </div>
+                <div class="card-body">
+                    @if (!Model.UserProgress.Any())
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No question assignments have been made yet.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Assigned</th>
+                                        <th>Completed</th>
+                                        <th>Progress</th>
+                                        <th>Last Activity</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in Model.UserProgress.OrderByDescending(u => u.CompletionPercentage))
+                                    {
+                                        <tr class="@(user.IsOverdue ? "table-warning" : "")">
+                                            <td>
+                                                <div>
+                                                    <strong>@user.Name</strong>
+                                                    <br/>
+                                                    <small class="text-muted">@user.Email</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info">@user.AssignedQuestions</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">@user.CompletedQuestions</span>
+                                            </td>
+                                            <td>
+                                                <div class="progress" style="width: 100px;">
+                                                    <div class="progress-bar @(user.CompletionPercentage == 100 ? "bg-success" : user.CompletionPercentage > 50 ? "bg-info" : "bg-warning")" 
+                                                         role="progressbar" style="width: @user.CompletionPercentage.ToString("F1")%;" 
+                                                         aria-valuenow="@user.CompletionPercentage" aria-valuemin="0" aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">@user.CompletionPercentage.ToString("F1")%</small>
+                                            </td>
+                                            <td>
+                                                @if (user.LastActivity.HasValue)
+                                                {
+                                                    <span title="@user.LastActivity.Value.ToString("MMM dd, yyyy 'at' h:mm tt")">
+                                                        @user.LastActivity.Value.ToString("MMM dd")
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No activity</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (user.CompletionPercentage == 100)
+                                                {
+                                                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Complete</span>
+                                                }
+                                                else if (user.CompletedQuestions > 0)
+                                                {
+                                                    <span class="badge bg-info"><i class="bi bi-clock"></i> In Progress</span>
+                                                }
+                                                else if (user.IsOverdue)
+                                                {
+                                                    <span class="badge bg-warning"><i class="bi bi-exclamation-triangle"></i> Overdue</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary"><i class="bi bi-circle"></i> Not Started</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Progress -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-list-ul"></i> Section Progress</h5>
+                </div>
+                <div class="card-body">
+                    @if (!Model.SectionProgress.Any())
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No sections found.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var section in Model.SectionProgress.OrderByDescending(s => s.CompletionPercentage))
+                        {
+                            <div class="card mb-3">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title">@(section.DisplayName)</h6>
+                                    
+                                    <!-- Assignment Progress -->
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small class="text-muted">Assignment:</small>
+                                            <small class="text-muted">@(section.AssignedQuestions)/@(section.TotalQuestions)</small>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-info" role="progressbar" 
+                                                 style="width: @(section.AssignmentPercentage.ToString("F1"))%;">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Completion Progress -->
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small class="text-muted">Completion:</small>
+                                            <small class="text-muted">@(section.CompletedQuestions)/@(section.AssignedQuestions)</small>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: @(section.CompletionPercentage.ToString("F1"))%;">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Assigned Users -->
+                                    @if (section.AssignedUsers.Any())
+                                    {
+                                        <div class="mt-2">
+                                            <small class="text-muted">Assigned to:</small>
+                                            <div class="mt-1">
+                                                @foreach (var userName in section.AssignedUsers)
+                                                {
+                                                    <span class="badge bg-light text-dark me-1">@userName</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a asp-controller="QuestionAssignment" asp-action="Manage" asp-route-id="@Model.CampaignAssignmentId" class="btn btn-primary">
+        <i class="bi bi-arrow-left"></i> Back to Assignment Management
+    </a>
+    <a asp-controller="Campaign" asp-action="Details" asp-route-id="@Model.CampaignAssignmentId" class="btn btn-outline-secondary">
+        <i class="bi bi-list"></i> Campaign Details
+    </a>
+</div>
+
+<style>
+    .progress-sm {
+        height: 0.5rem;
+    }
+    
+    .progress {
+        border-radius: 0.25rem;
+    }
+    
+    .card-title {
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+    }
+</style> 

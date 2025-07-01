@@ -1,0 +1,150 @@
+@model ESGPlatform.Models.ViewModels.OrganizationRelationshipCreateViewModel
+
+@{
+    ViewData["Title"] = "Create Organization Relationship";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-diagram-3"></i> Create Organization Relationship
+                </h3>
+            </div>
+            <div class="card-body">
+                <form asp-action="Create" method="post">
+                    <div asp-validation-summary="All" class="alert alert-danger" style="display: none;"></div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="PlatformOrganizationId" class="form-label required"></label>
+                                <select asp-for="PlatformOrganizationId" asp-items="Model.AvailablePlatformOrganizations" class="form-control">
+                                    <option value="">-- Select Platform Organization --</option>
+                                </select>
+                                <span asp-validation-for="PlatformOrganizationId" class="text-danger"></span>
+                                <div class="form-text">The organization that will manage campaigns and assignments</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="SupplierOrganizationId" class="form-label required"></label>
+                                <select asp-for="SupplierOrganizationId" asp-items="Model.AvailableSupplierOrganizations" class="form-control">
+                                    <option value="">-- Select Supplier Organization --</option>
+                                </select>
+                                <span asp-validation-for="SupplierOrganizationId" class="text-danger"></span>
+                                <div class="form-text">The organization that will receive assignments and respond to campaigns</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="RelationshipType" class="form-label required"></label>
+                                <select asp-for="RelationshipType" asp-items="Model.AvailableRelationshipTypes" class="form-control">
+                                </select>
+                                <span asp-validation-for="RelationshipType" class="text-danger"></span>
+                                <div class="form-text">The type of business relationship</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <div class="form-check">
+                                    <input asp-for="IsActive" class="form-check-input" type="checkbox" checked>
+                                    <label asp-for="IsActive" class="form-check-label"></label>
+                                </div>
+                                <div class="form-text">Active relationships can receive campaign assignments</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label asp-for="Description" class="form-label"></label>
+                        <textarea asp-for="Description" class="form-control" rows="3" placeholder="Optional description of the relationship..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                        <div class="form-text">Provide additional context about this relationship</div>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <div class="form-check">
+                            <input asp-for="IsPrimaryRelationship" class="form-check-input" type="checkbox">
+                            <label asp-for="IsPrimaryRelationship" class="form-check-label"></label>
+                        </div>
+                        <div class="form-text">Primary relationships inherit branding from the platform organization</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <a asp-action="Index" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to List
+                            </a>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Create Relationship
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i> About Organization Relationships
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>What are Organization Relationships?</h6>
+                <p class="text-muted small">
+                    Organization relationships define how Platform Organizations work with Supplier Organizations. 
+                    They control access, campaign assignments, and branding inheritance.
+                </p>
+
+                <h6>Relationship Types</h6>
+                <ul class="small text-muted">
+                    <li><strong>Supplier:</strong> Standard supplier relationship</li>
+                    <li><strong>Partner:</strong> Strategic partnership</li>
+                    <li><strong>Vendor:</strong> Service vendor relationship</li>
+                    <li><strong>Contractor:</strong> Contractual relationship</li>
+                </ul>
+
+                <h6>Primary Relationships</h6>
+                <p class="text-muted small">
+                    Primary relationships inherit branding and styling from the platform organization, 
+                    providing a consistent experience for the supplier.
+                </p>
+
+                <div class="alert alert-info small">
+                    <i class="bi bi-lightbulb"></i>
+                    <strong>Tip:</strong> Once created, you can add relationship-specific attributes 
+                    like ABC segmentation and supplier classification.
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-list-check"></i> Next Steps
+                </h5>
+            </div>
+            <div class="card-body">
+                <ol class="small">
+                    <li>Create the relationship</li>
+                    <li>Add relationship-specific attributes</li>
+                    <li>Create campaigns and assign to the supplier</li>
+                    <li>Monitor progress and responses</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+} 

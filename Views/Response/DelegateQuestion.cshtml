@@ -1,0 +1,141 @@
+@model ESGPlatform.Models.ViewModels.DelegateQuestionViewModel
+@{
+    ViewData["Title"] = "Delegate Question";
+}
+
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">
+                        <i class="bi bi-share"></i> Delegate Question
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Campaign & Questionnaire Info -->
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-clipboard-data"></i> Campaign: @Model.CampaignName</h6>
+                        <p class="mb-0"><strong>Questionnaire:</strong> @Model.QuestionnaireTitle</p>
+                    </div>
+
+                    <!-- Question Display -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Question to Delegate</h6>
+                        </div>
+                        <div class="card-body">
+                            <h6>@Model.QuestionText</h6>
+                            @if (!string.IsNullOrEmpty(Model.HelpText))
+                            {
+                                <p class="text-muted small">@Model.HelpText</p>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Delegation Form -->
+                    <form asp-action="DelegateQuestion" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="AssignmentId" />
+                        <input type="hidden" asp-for="QuestionId" />
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label asp-for="ToUserId" class="form-label">Delegate To</label>
+                                    <select asp-for="ToUserId" class="form-select" required>
+                                        <option value="">-- Select Team Member --</option>
+                                        @foreach (var member in Model.TeamMembers)
+                                        {
+                                            <option value="@member.Id">@member.FullName (@member.Email)</option>
+                                        }
+                                    </select>
+                                    <span asp-validation-for="ToUserId" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label asp-for="Instructions" class="form-label">Instructions</label>
+                            <textarea asp-for="Instructions" class="form-control" rows="4" 
+                                      placeholder="Provide specific instructions or context for completing this question..."></textarea>
+                            <div class="form-text">Optional: Provide additional context or specific instructions for the delegated user.</div>
+                            <span asp-validation-for="Instructions" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label asp-for="Notes" class="form-label">Additional Notes</label>
+                            <textarea asp-for="Notes" class="form-control" rows="3" 
+                                      placeholder="Any additional notes or comments..."></textarea>
+                            <div class="form-text">Optional: Any additional notes about this delegation.</div>
+                            <span asp-validation-for="Notes" class="text-danger"></span>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="AnswerQuestionnaire" asp-route-id="@Model.AssignmentId" 
+                               class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-share"></i> Delegate Question
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Team Members Preview -->
+            @if (Model.TeamMembers.Any())
+            {
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Available Team Members</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            @foreach (var member in Model.TeamMembers)
+                            {
+                                <div class="col-md-6 col-lg-4 mb-2">
+                                    <div class="border rounded p-2">
+                                        <div class="d-flex align-items-center">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-bold">@member.FullName</div>
+                                                <div class="text-muted small">@member.Email</div>
+                                                @if (!string.IsNullOrEmpty(member.Role))
+                                                {
+                                                    <div class="text-muted small">@member.Role</div>
+                                                }
+                                            </div>
+                                            <div class="text-end">
+                                                @if (member.IsActive)
+                                                {
+                                                    <span class="badge bg-success">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Inactive</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning mt-4">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    No team members available for delegation. Please contact your administrator.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+} 

@@ -1,0 +1,202 @@
+@model ESGPlatform.Models.ViewModels.OrganizationRelationshipViewModel
+
+@{
+    ViewData["Title"] = "Edit Organization Relationship";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">
+                    <i class="bi bi-pencil-square"></i> Edit Organization Relationship
+                </h3>
+            </div>
+            <div class="card-body">
+                <form asp-action="Edit" method="post">
+                    <input asp-for="Id" type="hidden" />
+                    <input asp-for="PlatformOrganizationId" type="hidden" />
+                    <input asp-for="SupplierOrganizationId" type="hidden" />
+                    <input asp-for="PlatformOrganizationName" type="hidden" />
+                    <input asp-for="SupplierOrganizationName" type="hidden" />
+                    <input asp-for="CreatedAt" type="hidden" />
+                    
+                    <div asp-validation-summary="All" class="alert alert-danger" style="display: none;"></div>
+
+                    <!-- Organization Information (Read-only) -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Platform Organization</label>
+                                <div class="form-control-plaintext border rounded p-2 bg-light">
+                                    <i class="bi bi-building text-primary"></i> @Model.PlatformOrganizationName
+                                </div>
+                                <div class="form-text">The organization that manages campaigns (cannot be changed)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Supplier Organization</label>
+                                <div class="form-control-plaintext border rounded p-2 bg-light">
+                                    <i class="bi bi-shop text-success"></i> @Model.SupplierOrganizationName
+                                </div>
+                                <div class="form-text">The organization that receives assignments (cannot be changed)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editable Fields -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label asp-for="RelationshipType" class="form-label required"></label>
+                                <select asp-for="RelationshipType" asp-items="Model.AvailableRelationshipTypes" class="form-control">
+                                </select>
+                                <span asp-validation-for="RelationshipType" class="text-danger"></span>
+                                <div class="form-text">The type of business relationship</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <div class="form-check">
+                                    <input asp-for="IsActive" class="form-check-input" type="checkbox">
+                                    <label asp-for="IsActive" class="form-check-label"></label>
+                                </div>
+                                <div class="form-text">Active relationships can receive campaign assignments</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label asp-for="Description" class="form-label"></label>
+                        <textarea asp-for="Description" class="form-control" rows="3" placeholder="Optional description of the relationship..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                        <div class="form-text">Provide additional context about this relationship</div>
+                    </div>
+
+                    <div class="form-group mb-4">
+                        <div class="form-check">
+                            <input asp-for="IsPrimaryRelationship" class="form-check-input" type="checkbox">
+                            <label asp-for="IsPrimaryRelationship" class="form-check-label"></label>
+                        </div>
+                        <div class="form-text">Primary relationships inherit branding from the platform organization</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Details
+                            </a>
+                            <a asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-list"></i> All Relationships
+                            </a>
+                        </div>
+                        <div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Update Relationship
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <!-- Relationship Information -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i> Relationship Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-sm-5 text-muted">Created:</div>
+                    <div class="col-sm-7">@Model.CreatedAt.ToString("MMM dd, yyyy 'at' h:mm tt")</div>
+                </div>
+                @if (Model.UpdatedAt.HasValue)
+                {
+                    <div class="row mb-2">
+                        <div class="col-sm-5 text-muted">Last Updated:</div>
+                        <div class="col-sm-7">@Model.UpdatedAt.Value.ToString("MMM dd, yyyy 'at' h:mm tt")</div>
+                    </div>
+                }
+                @if (!string.IsNullOrEmpty(Model.CreatedByUserName))
+                {
+                    <div class="row mb-2">
+                        <div class="col-sm-5 text-muted">Created By:</div>
+                        <div class="col-sm-7">@Model.CreatedByUserName</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Relationship Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i> Relationship Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a asp-action="ManageAttributes" asp-route-id="@Model.Id" class="btn btn-outline-primary">
+                        <i class="bi bi-tags"></i> Manage Attributes
+                    </a>
+                    @if (Model.Attributes.Any())
+                    {
+                        <small class="text-muted">@Model.Attributes.Count attribute(s) assigned</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">No attributes assigned yet</small>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Attributes -->
+        @if (Model.Attributes.Any())
+        {
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-tags"></i> Current Attributes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    @foreach (var attr in Model.Attributes.Where(a => a.IsActive))
+                    {
+                        <div class="mb-2">
+                            <span class="badge bg-primary me-1">@attr.AttributeType</span>
+                            <span class="text-muted">@attr.AttributeValue</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- About Editing -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-lightbulb"></i> About Editing
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    <strong>Organization changes:</strong> The platform and supplier organizations cannot be changed once a relationship is created. 
+                    Create a new relationship if you need different organizations.
+                </p>
+                <p class="text-muted small">
+                    <strong>Relationship attributes:</strong> Use the "Manage Attributes" button to add or modify relationship-specific attributes 
+                    like ABC segmentation and supplier classification.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+} 

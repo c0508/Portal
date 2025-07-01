@@ -1,0 +1,426 @@
+@model ESGPlatform.Models.ViewModels.QuestionAssignmentManagementViewModel
+@{
+    ViewData["Title"] = "Manage Question Assignments";
+}
+
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-person-plus"></i> Manage Question Assignments</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-controller="Campaign" asp-action="Index">Campaigns</a></li>
+                    <li class="breadcrumb-item"><a asp-controller="Campaign" asp-action="Details" asp-route-id="@Model.CampaignAssignmentId">@Model.CampaignName</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Question Assignments</li>
+                </ol>
+            </nav>
+        </div>
+        <div>
+            <a asp-controller="QuestionAssignment" asp-action="Progress" asp-route-id="@Model.CampaignAssignmentId" 
+               class="btn btn-outline-info">
+                <i class="bi bi-graph-up"></i> View Progress
+            </a>
+        </div>
+    </div>
+
+    <!-- Campaign Information -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5><i class="bi bi-building"></i> @Model.TargetOrganizationName</h5>
+                    <p class="text-muted mb-0">@Model.QuestionnaireTitle</p>
+                </div>
+                <div class="col-md-6">
+                    @if (!string.IsNullOrEmpty(Model.LeadResponderName))
+                    {
+                        <strong>Lead Responder:</strong> @Model.LeadResponderName
+                    }
+                    else
+                    {
+                        <span class="text-warning"><i class="bi bi-exclamation-triangle"></i> No lead responder assigned</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignment Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>@Model.TotalQuestions</h3>
+                    <p class="mb-0">Total Questions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>@Model.AssignedQuestions</h3>
+                    <p class="mb-0">Assigned</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h3>@Model.UnassignedQuestions</h3>
+                    <p class="mb-0">Unassigned</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>@((Model.TotalQuestions > 0 ? (Model.AssignedQuestions * 100) / Model.TotalQuestions : 0))%</h3>
+                    <p class="mb-0">Progress</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Question Structure Panel -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-list-ul"></i> Questionnaire Structure</h5>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#bulkAssignModal">
+                        <i class="bi bi-people"></i> Bulk Assign
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (!Model.Sections.Any())
+                    {
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> No questions found in this questionnaire.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="accordion" id="sectionsAccordion">
+                            @for (int i = 0; i < Model.Sections.Count; i++)
+                            {
+                                var section = Model.Sections[i];
+                                var sectionId = $"section_{i}";
+                                var progressPercentage = section.TotalQuestions > 0 ? (section.AssignedQuestions * 100) / section.TotalQuestions : 0;
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading_@sectionId">
+                                        <button class="accordion-button @(i == 0 ? "" : "collapsed")" type="button" 
+                                                data-bs-toggle="collapse" data-bs-target="#collapse_@sectionId" 
+                                                aria-expanded="@(i == 0 ? "true" : "false")" aria-controls="collapse_@sectionId">
+                                            <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                                <div>
+                                                    <strong>@(section.DisplayName)</strong>
+                                                    <span class="badge bg-secondary ms-2">@(section.Questions.Count) questions</span>
+                                                    @if (section.IsFullyAssigned)
+                                                    {
+                                                        <span class="badge bg-success ms-1">
+                                                            <i class="bi bi-person-check"></i> @(section.AssignedToUserName)
+                                                        </span>
+                                                    }
+                                                </div>
+                                                <div class="text-end">
+                                                    <div class="progress" style="width: 100px; height: 8px;">
+                                                        <div class="progress-bar" role="progressbar" style="width: @(progressPercentage)%"></div>
+                                                    </div>
+                                                    <small class="text-muted">@(section.AssignedQuestions)/@(section.TotalQuestions) assigned</small>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse_@sectionId" class="accordion-collapse collapse @(i == 0 ? "show" : "")" 
+                                         aria-labelledby="heading_@sectionId" data-bs-parent="#sectionsAccordion">
+                                        <div class="accordion-body">
+                                            <!-- Section Assignment Controls -->
+                                            @if (!section.IsFullyAssigned)
+                                            {
+                                                <div class="alert alert-light border mb-3">
+                                                    <div class="row align-items-center">
+                                                        <div class="col-md-6">
+                                                            <strong>Assign Entire Section:</strong>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <form asp-controller="QuestionAssignment" asp-action="AssignSection" method="post" class="d-inline">
+                                                                <div class="input-group input-group-sm">
+                                                                    <select name="assignedUserId" class="form-select" required>
+                                                                        <option value="">Select User...</option>
+                                                                        @foreach (var user in Model.AvailableUsers)
+                                                                        {
+                                                                            <option value="@user.UserId">@user.Name</option>
+                                                                        }
+                                                                    </select>
+                                                                    <input type="hidden" name="campaignAssignmentId" value="@Model.CampaignAssignmentId" />
+                                                                    <input type="hidden" name="sectionName" value="@(section.SectionName)" />
+                                                                    <button type="submit" class="btn btn-success btn-sm">
+                                                                        <i class="bi bi-check"></i> Assign
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+
+                                            <!-- Questions List -->
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 50%;">Question</th>
+                                                            <th style="width: 15%;">Type</th>
+                                                            <th style="width: 20%;">Assigned To</th>
+                                                            <th style="width: 15%;">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var question in section.Questions)
+                                                        {
+                                                            <tr class="@(question.IsAssigned ? "table-success" : "")">
+                                                                <td>
+                                                                    <div class="d-flex align-items-start">
+                                                                        @if (question.IsRequired)
+                                                                        {
+                                                                            <span class="badge bg-danger me-2" title="Required">*</span>
+                                                                        }
+                                                                        <span class="question-text">@question.QuestionText</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <span class="badge bg-secondary">@question.QuestionType</span>
+                                                                </td>
+                                                                <td>
+                                                                    @if (question.IsAssigned)
+                                                                    {
+                                                                        <span class="text-success">
+                                                                            <i class="bi bi-person-check"></i> @question.AssignedToUserName
+                                                                        </span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span class="text-muted">Unassigned</span>
+                                                                    }
+                                                                </td>
+                                                                <td>
+                                                                    @if (question.IsAssigned)
+                                                                    {
+                                                                        <form asp-controller="QuestionAssignment" asp-action="Delete" method="post" class="d-inline">
+                                                                            <input type="hidden" name="id" value="@question.AssignmentId" />
+                                                                            <input type="hidden" name="campaignAssignmentId" value="@Model.CampaignAssignmentId" />
+                                                                            <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                                                    onclick="return confirm('Remove assignment for this question?')">
+                                                                                <i class="bi bi-x"></i>
+                                                                            </button>
+                                                                        </form>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <form asp-controller="QuestionAssignment" asp-action="AssignQuestion" method="post" class="d-inline">
+                                                                            <div class="input-group input-group-sm" style="width: 200px;">
+                                                                                <select name="assignedUserId" class="form-select" required>
+                                                                                    <option value="">Assign to...</option>
+                                                                                    @foreach (var user in Model.AvailableUsers)
+                                                                                    {
+                                                                                        <option value="@user.UserId">@user.Name</option>
+                                                                                    }
+                                                                                </select>
+                                                                                <input type="hidden" name="campaignAssignmentId" value="@Model.CampaignAssignmentId" />
+                                                                                <input type="hidden" name="questionId" value="@question.QuestionId" />
+                                                                                <button type="submit" class="btn btn-success btn-sm">
+                                                                                    <i class="bi bi-check"></i>
+                                                                                </button>
+                                                                            </div>
+                                                                        </form>
+                                                                    }
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Panel -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-people"></i> Available Users</h5>
+                </div>
+                <div class="card-body">
+                    @if (!Model.AvailableUsers.Any())
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> No users available for assignment.
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var user in Model.AvailableUsers)
+                        {
+                            <div class="card mb-2 @(user.IsLeadResponder ? "border-primary" : "")">
+                                <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>@user.Name</strong>
+                                            @if (user.IsLeadResponder)
+                                            {
+                                                <span class="badge bg-primary ms-1">Lead</span>
+                                            }
+                                            <br/>
+                                            <small class="text-muted">@user.Email</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge bg-info">@user.AssignedQuestions Q</span>
+                                            <span class="badge bg-secondary">@user.AssignedSections S</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Assignment Modal -->
+<div class="modal fade" id="bulkAssignModal" tabindex="-1" aria-labelledby="bulkAssignModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-controller="QuestionAssignment" asp-action="BulkAssign" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="bulkAssignModalLabel">Bulk Assignment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="CampaignAssignmentId" value="@Model.CampaignAssignmentId" />
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Assign To:</label>
+                        <select name="AssignedUserId" class="form-select" required>
+                            <option value="">Select User...</option>
+                            @foreach (var user in Model.AvailableUsers)
+                            {
+                                <option value="@user.UserId">@user.Name (@user.Email)</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Assignment Type:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="AssignmentType" id="assignSections" value="Section" checked>
+                            <label class="form-check-label" for="assignSections">
+                                Assign Sections
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="AssignmentType" id="assignQuestions" value="Questions">
+                            <label class="form-check-label" for="assignQuestions">
+                                Assign Individual Questions
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="sectionsSelection">
+                        <label class="form-label">Select Sections:</label>
+                        @foreach (var section in Model.Sections.Where(s => !s.IsFullyAssigned))
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="SelectedSections" value="@(section.SectionName)" id="section_@(section.SectionName)">
+                                <label class="form-check-label" for="section_@(section.SectionName)">
+                                    @(section.DisplayName) (@(section.TotalQuestions) questions)
+                                </label>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-3" id="questionsSelection" style="display: none;">
+                        <label class="form-label">Select Questions:</label>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            @foreach (var section in Model.Sections)
+                            {
+                                <h6 class="mt-3">@(section.DisplayName)</h6>
+                                @foreach (var question in section.Questions.Where(q => !q.IsAssigned))
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="SelectedQuestionIds" value="@question.QuestionId" id="question_@question.QuestionId">
+                                        <label class="form-check-label" for="question_@question.QuestionId">
+                                            @question.QuestionText
+                                        </label>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="instructions" class="form-label">Instructions (Optional):</label>
+                        <textarea name="Instructions" id="instructions" class="form-control" rows="3" placeholder="Additional instructions for the assigned user..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Assign Selected</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Toggle between sections and questions selection
+        document.addEventListener('DOMContentLoaded', function() {
+            const sectionRadio = document.getElementById('assignSections');
+            const questionRadio = document.getElementById('assignQuestions');
+            const sectionsDiv = document.getElementById('sectionsSelection');
+            const questionsDiv = document.getElementById('questionsSelection');
+
+            function toggleSelectionType() {
+                if (sectionRadio.checked) {
+                    sectionsDiv.style.display = 'block';
+                    questionsDiv.style.display = 'none';
+                } else {
+                    sectionsDiv.style.display = 'none';
+                    questionsDiv.style.display = 'block';
+                }
+            }
+
+            sectionRadio.addEventListener('change', toggleSelectionType);
+            questionRadio.addEventListener('change', toggleSelectionType);
+        });
+    </script>
+}
+
+<style>
+    .question-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 400px;
+    }
+    
+    .progress {
+        border-radius: 0.25rem;
+    }
+    
+    .accordion-button:not(.collapsed) {
+        background-color: #f8f9fa;
+    }
+</style> 

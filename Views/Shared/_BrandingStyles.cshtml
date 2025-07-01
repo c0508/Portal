@@ -1,0 +1,248 @@
+@{
+    var brandingContext = ViewBag.BrandingContext as ESGPlatform.Services.BrandingContext;
+    if (brandingContext == null) return;
+}
+
+<style>
+    :root {
+        @Html.Raw(brandingContext.ToCssVariables())
+    }
+    
+    /* Debug: Show that branding styles are loaded */
+    body::before {
+        content: "Branding loaded: @brandingContext.OrganizationName";
+        position: fixed;
+        top: 0;
+        right: 0;
+        background: red;
+        color: white;
+        padding: 2px 5px;
+        font-size: 10px;
+        z-index: 9999;
+        display: none; /* Hidden by default, enable for debugging */
+    }
+    
+    /* Dynamic branding styles */
+    .navbar-brand {
+        color: var(--brand-primary) !important;
+        font-weight: bold;
+    }
+    
+    .navbar-nav .nav-link.active {
+        color: var(--brand-primary) !important;
+        border-bottom: 2px solid var(--brand-primary);
+    }
+    
+    .btn-primary {
+        background-color: var(--brand-primary);
+        border-color: var(--brand-primary);
+    }
+    
+    .btn-primary:hover, .btn-primary:focus {
+        background-color: var(--brand-secondary);
+        border-color: var(--brand-secondary);
+    }
+    
+    .badge.bg-primary {
+        background-color: var(--brand-primary) !important;
+    }
+    
+    .card-header.branded {
+        @Html.Raw(brandingContext.GetBrandedCardHeaderStyle())
+    }
+    
+    .navbar.branded {
+        @Html.Raw(brandingContext.GetBrandedNavbarStyle())
+    }
+    
+    /* More specific branded navbar text styling to override Bootstrap */
+    .navbar.navbar-light.branded .navbar-brand,
+    .navbar.branded .navbar-brand {
+        color: var(--brand-nav-text) !important;
+        font-weight: bold;
+    }
+    
+    .navbar.navbar-light.branded .nav-link,
+    .navbar.branded .nav-link {
+        color: var(--brand-nav-text) !important;
+    }
+    
+    .navbar.navbar-light.branded .nav-link:hover,
+    .navbar.navbar-light.branded .nav-link:focus,
+    .navbar.branded .nav-link:hover,
+    .navbar.branded .nav-link:focus {
+        color: var(--brand-nav-text) !important;
+        opacity: 0.8;
+    }
+    
+    .navbar.navbar-light.branded .navbar-text,
+    .navbar.branded .navbar-text {
+        color: var(--brand-nav-text) !important;
+        opacity: 0.9;
+    }
+    
+    .navbar.navbar-light.branded .dropdown-toggle,
+    .navbar.branded .dropdown-toggle {
+        color: var(--brand-nav-text) !important;
+    }
+    
+    .navbar.navbar-light.branded .dropdown-toggle:hover,
+    .navbar.branded .dropdown-toggle:hover {
+        color: var(--brand-nav-text) !important;
+        opacity: 0.8;
+    }
+    
+    /* Override any remaining Bootstrap text colors */
+    .navbar.branded .nav-link.text-dark {
+        color: var(--brand-nav-text) !important;
+    }
+    
+    /* Navbar toggler for mobile */
+    .navbar.navbar-light.branded .navbar-toggler,
+    .navbar.branded .navbar-toggler {
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .navbar.navbar-light.branded .navbar-toggler-icon,
+    .navbar.branded .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    }
+    
+    .organization-logo {
+        max-height: 40px;
+        width: auto;
+        margin-right: 10px;
+    }
+    
+    .branding-indicator {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        margin-left: 10px;
+    }
+    
+    .context-switch-indicator {
+        background: linear-gradient(45deg, var(--brand-primary), var(--brand-secondary));
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        margin-left: 8px;
+    }
+    
+    /* Campaign-specific styling */
+    .campaign-branded .card {
+        border-left: 4px solid var(--brand-primary);
+    }
+    
+    .campaign-branded .card-header {
+        background: linear-gradient(135deg, var(--brand-primary)15, var(--brand-secondary)15);
+    }
+    
+    /* Supplier organization styling when viewing platform campaigns */
+    .supplier-context .alert-info {
+        background: linear-gradient(135deg, var(--brand-primary)10, var(--brand-secondary)10);
+        border-color: var(--brand-primary);
+    }
+    
+    /* Organization type indicators */
+    .org-type-platform {
+        color: var(--brand-primary);
+    }
+    
+    .org-type-supplier {
+        color: var(--brand-secondary);
+    }
+    
+    /* Sidebar branding enhancements - light and elegant */
+    .esg-sidebar.branded .nav-link i {
+        color: #6b7280;
+        transition: all 0.2s ease;
+        margin-right: 0.75rem;
+    }
+    
+    .esg-sidebar.branded .nav-link:hover i {
+        color: var(--brand-primary);
+        transform: scale(1.1);
+    }
+    
+    .esg-sidebar.branded .nav-link.active i {
+        color: var(--brand-primary);
+    }
+    
+    /* Enhanced focus states for accessibility */
+    .esg-sidebar.branded .nav-link:focus {
+        outline: 2px solid var(--brand-primary);
+        outline-offset: -2px;
+        background-color: rgba(var(--brand-primary-rgb), 0.05);
+    }
+    
+    /* Coming soon badge styling for branded sidebar */
+    .esg-sidebar.branded .coming-soon {
+        background: rgba(var(--brand-primary-rgb), 0.1);
+        color: var(--brand-primary);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 500;
+    }
+    
+    /* Organization type badges integration with sidebar branding */
+    .org-type-platform {
+        background-color: var(--brand-primary) !important;
+        font-size: 0.8rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+    }
+    
+    .org-type-supplier {
+        background-color: var(--brand-secondary) !important;
+        font-size: 0.8rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+    }
+    
+    /* Smooth animations for better UX */
+    .esg-sidebar.branded .nav-link {
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .esg-sidebar.branded .nav-link::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 0;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
+        transition: width 0.3s ease;
+        border-radius: 0 4px 4px 0;
+    }
+    
+    .esg-sidebar.branded .nav-link.active::before {
+        width: 4px;
+    }
+    
+    .esg-sidebar.branded .nav-link:hover::before {
+        width: 3px;
+    }
+    
+    /* Responsive branding adjustments */
+    @@media (max-width: 768px) {
+        .organization-logo {
+            max-height: 30px;
+        }
+        
+        .branding-indicator {
+            display: none;
+        }
+        
+        .esg-sidebar.branded {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+    }
+</style>
+
+@if (!string.IsNullOrEmpty(brandingContext.LogoUrl))
+{
+    <link rel="preload" href="@brandingContext.LogoUrl" as="image">
+} 

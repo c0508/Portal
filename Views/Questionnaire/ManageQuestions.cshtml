@@ -1,0 +1,209 @@
+@model ESGPlatform.Models.Entities.Questionnaire
+
+@{
+    ViewData["Title"] = "Manage Questions";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a asp-action="Index">Questionnaires</a></li>
+                    <li class="breadcrumb-item"><a asp-action="Details" asp-route-id="@Model.Id">@Model.Title</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Manage Questions</li>
+                </ol>
+            </nav>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-1">
+                        <i class="bi bi-list-ul me-2"></i>
+                        Manage Questions
+                    </h1>
+                    <p class="text-muted mb-0">@Model.Title</p>
+                </div>
+                <div class="btn-group">
+                    <a asp-action="AddQuestion" asp-route-id="@Model.Id" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Add Question
+                    </a>
+                    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        Back to Details
+                    </a>
+                </div>
+            </div>
+
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            @if (Model.Questions.Any())
+            {
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="bi bi-question-circle me-2"></i>
+                                Questions (@Model.Questions.Count)
+                            </h5>
+                            <small class="text-muted">Drag and drop to reorder</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="questionsList">
+                            @foreach (var question in Model.Questions.OrderBy(q => q.DisplayOrder))
+                            {
+                                <div class="question-item list-group-item" data-question-id="@question.Id">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <div class="drag-handle me-3">
+                                                    <i class="bi bi-grip-vertical text-muted"></i>
+                                                </div>
+                                                <span class="badge bg-light text-dark me-2">#@question.DisplayOrder</span>
+                                                <span class="badge bg-info me-2">@question.QuestionType</span>
+                                                @if (question.IsRequired)
+                                                {
+                                                    <span class="badge bg-warning text-dark">Required</span>
+                                                }
+                                            </div>
+                                            <h6 class="mb-1 ms-5">@question.QuestionText</h6>
+                                            @if (!string.IsNullOrEmpty(question.HelpText))
+                                            {
+                                                <p class="text-muted small mb-2 ms-5">@question.HelpText</p>
+                                            }
+                                            @if (!string.IsNullOrEmpty(question.Options) && (question.QuestionType == ESGPlatform.Models.Entities.QuestionType.Select || question.QuestionType == ESGPlatform.Models.Entities.QuestionType.Radio || question.QuestionType == ESGPlatform.Models.Entities.QuestionType.Checkbox))
+                                            {
+                                                <div class="mt-2 ms-5">
+                                                    <small class="text-muted">Options:</small>
+                                                    <ul class="small text-muted mb-0">
+                                                        @foreach (var option in question.Options.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                                                        {
+                                                            <li>@option.Trim()</li>
+                                                        }
+                                                    </ul>
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="btn-group btn-group-sm">
+                                            <a asp-action="EditQuestion" asp-route-id="@question.Id" class="btn btn-outline-primary" title="Edit Question">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-outline-danger" onclick="deleteQuestion(@question.Id, @Model.Id)" title="Delete Question">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Questions are displayed in the order they will appear to users
+                            </small>
+                            <button type="button" class="btn btn-sm btn-success" onclick="saveQuestionOrder()" id="saveOrderBtn" style="display: none;">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Save Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-question-circle text-muted" style="font-size: 4rem;"></i>
+                        <h4 class="text-muted mt-3">No Questions Added</h4>
+                        <p class="text-muted mb-4">Start building your questionnaire by adding questions.</p>
+                        <a asp-action="AddQuestion" asp-route-id="@Model.Id" class="btn btn-primary">
+                            <i class="bi bi-plus-circle me-1"></i>
+                            Add Your First Question
+                        </a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Delete Question Form -->
+<form id="deleteQuestionForm" method="post" style="display: none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" id="deleteQuestionId" name="id" />
+    <input type="hidden" id="deleteQuestionnaireId" name="questionnaireId" />
+</form>
+
+<!-- Reorder Questions Form -->
+<form id="reorderQuestionsForm" method="post" style="display: none;">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="questionnaireId" value="@Model.Id" />
+    <input type="hidden" id="questionIds" name="questionIds" />
+</form>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script>
+        let questionsList = document.getElementById('questionsList');
+        let saveOrderBtn = document.getElementById('saveOrderBtn');
+        let originalOrder = [];
+
+        if (questionsList) {
+            // Initialize Sortable
+            let sortable = Sortable.create(questionsList, {
+                handle: '.drag-handle',
+                animation: 150,
+                onStart: function() {
+                    // Store original order
+                    originalOrder = Array.from(questionsList.children).map(item => item.dataset.questionId);
+                },
+                onEnd: function() {
+                    // Check if order changed
+                    let newOrder = Array.from(questionsList.children).map(item => item.dataset.questionId);
+                    let orderChanged = !originalOrder.every((id, index) => id === newOrder[index]);
+                    
+                    if (orderChanged) {
+                        saveOrderBtn.style.display = 'inline-block';
+                        updateOrderNumbers();
+                    }
+                }
+            });
+        }
+
+        function updateOrderNumbers() {
+            let items = questionsList.children;
+            for (let i = 0; i < items.length; i++) {
+                let badge = items[i].querySelector('.badge.bg-light');
+                if (badge) {
+                    badge.textContent = '#' + (i + 1);
+                }
+            }
+        }
+
+        function saveQuestionOrder() {
+            let questionIds = Array.from(questionsList.children).map(item => item.dataset.questionId);
+            document.getElementById('questionIds').value = questionIds.join(',');
+            document.getElementById('reorderQuestionsForm').action = '@Url.Action("ReorderQuestions", "Questionnaire")';
+            document.getElementById('reorderQuestionsForm').submit();
+        }
+
+        function deleteQuestion(questionId, questionnaireId) {
+            if (confirm('Are you sure you want to delete this question? This action cannot be undone.')) {
+                document.getElementById('deleteQuestionId').value = questionId;
+                document.getElementById('deleteQuestionnaireId').value = questionnaireId;
+                document.getElementById('deleteQuestionForm').action = '@Url.Action("DeleteQuestion", "Questionnaire")';
+                document.getElementById('deleteQuestionForm').submit();
+            }
+        }
+    </script>
+} 

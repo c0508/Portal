@@ -1,0 +1,196 @@
+@model ESGPlatform.Models.ViewModels.UserInviteViewModel
+
+@{
+    ViewData["Title"] = "Invite User";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title mb-0">@ViewData["Title"]</h3>
+            </div>
+            <div class="card-body">
+                <form asp-action="Invite" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="FirstName" class="form-label required"></label>
+                                <input asp-for="FirstName" class="form-control" placeholder="Enter first name" />
+                                <span asp-validation-for="FirstName" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="LastName" class="form-label required"></label>
+                                <input asp-for="LastName" class="form-control" placeholder="Enter last name" />
+                                <span asp-validation-for="LastName" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label required"></label>
+                        <input asp-for="Email" class="form-control" placeholder="user@company.com" />
+                        <div class="form-text">The user will receive login instructions at this email address</div>
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="OrganizationId" class="form-label required"></label>
+                                <select asp-for="OrganizationId" asp-items="Model.Organizations" class="form-select">
+                                    <option value="">Select an organization</option>
+                                </select>
+                                <span asp-validation-for="OrganizationId" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label asp-for="Role" class="form-label required"></label>
+                                <select asp-for="Role" asp-items="Model.Roles" class="form-select">
+                                    <option value="">Select a role</option>
+                                </select>
+                                <span asp-validation-for="Role" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a asp-action="Index" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Users
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-envelope"></i> Send Invitation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Invitation Process</h5>
+            </div>
+            <div class="card-body">
+                <ol class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="bi bi-1-circle text-primary"></i>
+                        <strong>User Account Created</strong>
+                        <br><small class="text-muted">A new user account will be created with the provided information</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-2-circle text-primary"></i>
+                        <strong>Temporary Password Generated</strong>
+                        <br><small class="text-muted">A secure temporary password will be created</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-3-circle text-primary"></i>
+                        <strong>Role Assigned</strong>
+                        <br><small class="text-muted">The user will be assigned to the selected role and organization</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-4-circle text-primary"></i>
+                        <strong>Login Instructions</strong>
+                        <br><small class="text-muted">The user should be provided with their login credentials</small>
+                    </li>
+                </ol>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Role Descriptions</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row small">
+                    <dt class="col-sm-5">Org Admin</dt>
+                    <dd class="col-sm-7">Full organization management</dd>
+                    
+                    <dt class="col-sm-5">Campaign Manager</dt>
+                    <dd class="col-sm-7">Create and manage campaigns</dd>
+                    
+                    <dt class="col-sm-5">Lead Responder</dt>
+                    <dd class="col-sm-7">Coordinate response activities</dd>
+                    
+                    <dt class="col-sm-5">Responder</dt>
+                    <dd class="col-sm-7">Complete assigned questionnaires</dd>
+                    
+                    <dt class="col-sm-5">Reviewer</dt>
+                    <dd class="col-sm-7">Review and validate responses</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (TempData["TempPassword"] != null)
+{
+    <div class="modal fade" id="passwordModal" tabindex="-1" aria-labelledby="passwordModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="passwordModalLabel">User Invitation Successful</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Important:</strong> Please provide the following credentials to the user:
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-sm-4">Email:</dt>
+                                <dd class="col-sm-8"><code>@ViewBag.InvitedEmail</code></dd>
+                                <dt class="col-sm-4">Temporary Password:</dt>
+                                <dd class="col-sm-8"><code>@TempData["TempPassword"]</code></dd>
+                            </dl>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        The user should change this password after their first login.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="copyCredentials()">Copy Credentials</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            @if (TempData["TempPassword"] != null)
+            {
+                <text>
+                // Show the password modal
+                var passwordModal = new bootstrap.Modal(document.getElementById('passwordModal'));
+                passwordModal.show();
+                </text>
+            }
+        });
+
+        function copyCredentials() {
+            var credentials = "Email: @ViewBag.InvitedEmail\nTemporary Password: @TempData["TempPassword"]";
+            navigator.clipboard.writeText(credentials).then(function() {
+                alert('Credentials copied to clipboard!');
+            });
+        }
+    </script>
+}
+
+<style>
+    .required::after {
+        content: " *";
+        color: red;
+    }
+</style> 

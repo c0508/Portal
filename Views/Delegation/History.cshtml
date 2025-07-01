@@ -1,0 +1,274 @@
+@model ESGPlatform.Models.ViewModels.DelegationHistoryViewModel
+@{
+    ViewData["Title"] = "Delegation History";
+}
+
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-clock-history"></i> Delegation History</h2>
+                    <p class="text-muted mb-0">Complete history of all delegations</p>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                    <a asp-action="Timeline" class="btn btn-outline-info">
+                        <i class="bi bi-diagram-2"></i> Timeline View
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="bi bi-funnel"></i> Filters</h6>
+        </div>
+        <div class="card-body">
+            <form method="get" asp-action="History">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <select name="filterStatus" class="form-select" asp-for="FilterStatus">
+                            <option value="All">All Statuses</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Overdue">Overdue</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Type</label>
+                        <select name="filterType" class="form-select" asp-for="FilterType">
+                            <option value="All">All Delegations</option>
+                            <option value="Received">Received</option>
+                            <option value="Given">Given</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">From Date</label>
+                        <input type="date" name="filterDateFrom" class="form-control" asp-for="FilterDateFrom">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">To Date</label>
+                        <input type="date" name="filterDateTo" class="form-control" asp-for="FilterDateTo">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2">
+                            <i class="bi bi-search"></i> Filter
+                        </button>
+                        <a asp-action="History" class="btn btn-outline-secondary">
+                            <i class="bi bi-x"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                Delegation History 
+                <span class="badge bg-secondary">@Model.TotalItems total</span>
+            </h6>
+            <div class="d-flex align-items-center">
+                <span class="text-muted small me-3">
+                    Showing @((Model.Page - 1) * Model.PageSize + 1) - @Math.Min(Model.Page * Model.PageSize, Model.TotalItems) of @Model.TotalItems
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.History.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Question</th>
+                                <th>Campaign</th>
+                                <th>From/To</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Deadline</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.History)
+                            {
+                                <tr class="@(item.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Overdue ? "table-danger" : "")">
+                                    <td>
+                                        <div>
+                                            <strong>@(item.QuestionText.Length > 50 ? item.QuestionText.Substring(0, 50) + "..." : item.QuestionText)</strong>
+                                            @if (!string.IsNullOrEmpty(item.Instructions))
+                                            {
+                                                <br/><small class="text-muted">
+                                                    <em>"@(item.Instructions.Length > 60 ? item.Instructions.Substring(0, 60) + "..." : item.Instructions)"</em>
+                                                </small>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>@item.CampaignName</strong>
+                                            <br/><small class="text-muted">@item.QuestionnaireTitle</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (item.DelegationType == "Received")
+                                        {
+                                            <div>
+                                                <i class="bi bi-arrow-down text-primary"></i>
+                                                <strong>From:</strong> @item.FromUserName
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div>
+                                                <i class="bi bi-arrow-up text-success"></i>
+                                                <strong>To:</strong> @item.ToUserName
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge @(item.DelegationType == "Received" ? "bg-primary" : "bg-success")">
+                                            @item.DelegationType
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(item.Status)">
+                                            @item.Status
+                                        </span>
+                                        @if (item.HasResponse)
+                                        {
+                                            <br/><small class="text-success">
+                                                <i class="bi bi-check-circle"></i> Answered
+                                            </small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small>@item.CreatedAt.ToString("MMM dd, yyyy")</small>
+                                        @if (item.CompletedAt.HasValue)
+                                        {
+                                            <br/><small class="text-success">
+                                                Completed: @item.CompletedAt.Value.ToString("MMM dd")
+                                            </small>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (item.Deadline.HasValue)
+                                        {
+                                            <span class="@(item.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Overdue ? "text-danger fw-bold" : "")">
+                                                @item.Deadline.Value.ToString("MMM dd, yyyy")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">No deadline</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a asp-action="Details" asp-route-id="@item.Id" 
+                                               class="btn btn-sm btn-outline-primary" title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            @if (item.DelegationType == "Received" && item.Status == ESGPlatform.Models.ViewModels.DelegationStatus.Pending)
+                                            {
+                                                <a asp-controller="Response" asp-action="AnswerQuestionnaire" 
+                                                   asp-route-id="@item.Id" 
+                                                   class="btn btn-sm btn-primary" title="Answer Question">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                @if (Model.TotalPages > 1)
+                {
+                    <div class="card-footer">
+                        <nav aria-label="Delegation history pagination">
+                            <ul class="pagination justify-content-center mb-0">
+                                @if (Model.Page > 1)
+                                {
+                                    <li class="page-item">
+                                        <a class="page-link" href="@GetPageUrl(Model.Page - 1)">
+                                            <i class="bi bi-chevron-left"></i> Previous
+                                        </a>
+                                    </li>
+                                }
+
+                                @for (int i = Math.Max(1, Model.Page - 2); i <= Math.Min(Model.TotalPages, Model.Page + 2); i++)
+                                {
+                                    <li class="page-item @(i == Model.Page ? "active" : "")">
+                                        <a class="page-link" href="@GetPageUrl(i)">@i</a>
+                                    </li>
+                                }
+
+                                @if (Model.Page < Model.TotalPages)
+                                {
+                                    <li class="page-item">
+                                        <a class="page-link" href="@GetPageUrl(Model.Page + 1)">
+                                            Next <i class="bi bi-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                }
+                            </ul>
+                        </nav>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <h5 class="text-muted mt-3">No delegations found</h5>
+                    <p class="text-muted">Try adjusting your filters or check back later.</p>
+                    <a asp-action="Index" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@functions {
+    string GetStatusBadgeClass(ESGPlatform.Models.ViewModels.DelegationStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.ViewModels.DelegationStatus.Pending => "bg-warning",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Completed => "bg-success",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Overdue => "bg-danger",
+            ESGPlatform.Models.ViewModels.DelegationStatus.Cancelled => "bg-secondary",
+            _ => "bg-secondary"
+        };
+    }
+
+    string GetPageUrl(int page)
+    {
+        var url = Url.Action("History", new { 
+            filterStatus = Model.FilterStatus,
+            filterType = Model.FilterType,
+            filterDateFrom = Model.FilterDateFrom?.ToString("yyyy-MM-dd"),
+            filterDateTo = Model.FilterDateTo?.ToString("yyyy-MM-dd"),
+            page = page
+        });
+        return url ?? "#";
+    }
+} 

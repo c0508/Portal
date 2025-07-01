@@ -1,0 +1,425 @@
+@model ESGPlatform.Models.ViewModels.CampaignBulkAssignmentViewModel
+
+@{
+    ViewData["Title"] = "Bulk Assignment";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-people-fill"></i> Bulk Assignment</h1>
+        <p class="text-muted mb-0">Campaign: <strong>@Model.CampaignName</strong></p>
+    </div>
+    <div>
+        <a asp-action="ManageAssignments" asp-route-id="@Model.CampaignId" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Assignments
+        </a>
+    </div>
+</div>
+
+<form asp-action="BulkAssignment" method="post" id="bulkAssignmentForm">
+    <input asp-for="CampaignId" type="hidden" />
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <!-- Questionnaire Selection -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-file-earmark-text"></i> Questionnaire Selection</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <label asp-for="QuestionnaireVersionId" class="form-label"></label>
+                    <select asp-for="QuestionnaireVersionId" class="form-select">
+                        <option value="">-- Select Questionnaire Version --</option>
+                        @foreach (var version in Model.AvailableQuestionnaireVersions)
+                        {
+                            <option value="@version.Id">@version.DisplayText</option>
+                        }
+                    </select>
+                    <span asp-validation-for="QuestionnaireVersionId" class="text-danger"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Organization Selection -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="bi bi-building"></i> Organization Selection</h5>
+        </div>
+        <div class="card-body">
+            <!-- Filters -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Filter by Name</label>
+                    <input type="text" class="form-control" id="nameFilter" placeholder="Search organization name..." />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Filter by Attribute</label>
+                    <input type="text" class="form-control" id="attributeFilter" placeholder="Search attributes..." />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Actions</label>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="addAllBtn">
+                            <i class="bi bi-plus-circle"></i> Add All
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="clearFiltersBtn">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Dual Panel Interface -->
+            <div class="row">
+                <!-- Available Organizations Panel -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="bi bi-building"></i> Available Organizations 
+                                <span class="badge bg-secondary" id="availableCount">@Model.AvailableOrganizations.Count(o => !o.AlreadyAssigned)</span>
+                            </h6>
+                        </div>
+                        <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                            <div id="availableOrganizations">
+                                @foreach (var org in Model.AvailableOrganizations)
+                                {
+                                    <div class="organization-item p-3 border-bottom @(org.AlreadyAssigned ? "already-assigned" : "")" data-org-id="@org.Id" data-org-name="@org.Name" data-org-attributes="@string.Join(" ", org.Attributes.Select(a => $"{a.AttributeType} {a.Value}"))">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <h6 class="mb-1">
+                                                    @org.Name
+                                                    @if (org.AlreadyAssigned)
+                                                    {
+                                                        <span class="badge bg-success ms-2">
+                                                            <i class="bi bi-check-circle"></i> Already Assigned
+                                                        </span>
+                                                    }
+                                                </h6>
+                                                @if (!string.IsNullOrEmpty(org.Description))
+                                                {
+                                                    <p class="text-muted small mb-1">@org.Description</p>
+                                                }
+                                                <div class="d-flex flex-wrap gap-1 mb-2">
+                                                    <span class="badge bg-info">@org.Type</span>
+                                                    @if (org.UsersCount > 0)
+                                                    {
+                                                        <span class="badge bg-success">@org.UsersCount users</span>
+                                                    }
+                                                    @if (org.HasActiveRelationship)
+                                                    {
+                                                        <span class="badge bg-primary">Active Relationship</span>
+                                                    }
+                                                </div>
+                                                @if (org.Attributes.Any())
+                                                {
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        @foreach (var attr in org.Attributes)
+                                                        {
+                                                            <small class="badge bg-secondary">@attr.AttributeType: @attr.Value</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="text-muted small">No attributes assigned</div>
+                                                }
+
+                                            </div>
+                                            @if (org.AlreadyAssigned)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Already assigned to this campaign">
+                                                    <i class="bi bi-check"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-primary add-org-btn" data-org-id="@org.Id">
+                                                    <i class="bi bi-arrow-right"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                            <div id="noSearchResults" class="text-center text-muted p-4" style="display: none;">
+                                <i class="bi bi-search fs-1"></i>
+                                <p class="mt-2">No organizations match your search criteria</p>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('clearFiltersBtn').click()">
+                                    <i class="bi bi-x-circle"></i> Clear Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selected Organizations Panel -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">
+                                <i class="bi bi-check-circle"></i> Selected Organizations 
+                                <span class="badge bg-light text-dark" id="selectedCount">0</span>
+                            </h6>
+                        </div>
+                        <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                            <div id="selectedOrganizations">
+                                <div class="text-center text-muted p-4" id="emptySelectionMessage">
+                                    <i class="bi bi-arrow-left-circle fs-1"></i>
+                                    <p class="mt-2">Select organizations from the left panel</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hidden input for selected organization IDs -->
+            <input type="hidden" id="selectedOrganizationIds" name="SelectedOrganizationIds" value="" />
+
+            <!-- Summary and Actions -->
+            <div class="mt-4">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="alert alert-info" id="summaryAlert" style="display: none;">
+                            <i class="bi bi-info-circle"></i>
+                            <span id="summaryText">Ready to create assignments for selected organizations.</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button type="submit" class="btn btn-primary btn-lg" id="createAssignmentsBtn" disabled>
+                            <i class="bi bi-check-circle"></i> Create Assignments
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const availableContainer = document.getElementById('availableOrganizations');
+            const selectedContainer = document.getElementById('selectedOrganizations');
+            const availableCountBadge = document.getElementById('availableCount');
+            const selectedCountBadge = document.getElementById('selectedCount');
+            const emptyMessage = document.getElementById('emptySelectionMessage');
+            const summaryAlert = document.getElementById('summaryAlert');
+            const summaryText = document.getElementById('summaryText');
+            const createBtn = document.getElementById('createAssignmentsBtn');
+            const selectedIdsInput = document.getElementById('selectedOrganizationIds');
+            const nameFilter = document.getElementById('nameFilter');
+            const attributeFilter = document.getElementById('attributeFilter');
+            const addAllBtn = document.getElementById('addAllBtn');
+            const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+
+            let selectedOrganizations = [];
+
+            // Add organization to selection
+            function addOrganization(orgElement) {
+                const orgId = parseInt(orgElement.dataset.orgId);
+                const orgName = orgElement.dataset.orgName;
+                
+                // Don't add if already selected or already assigned
+                if (selectedOrganizations.includes(orgId) || orgElement.classList.contains('already-assigned')) {
+                    return;
+                }
+                
+                selectedOrganizations.push(orgId);
+                
+                // Create selected organization element
+                const selectedElement = orgElement.cloneNode(true);
+                selectedElement.classList.remove('already-assigned'); // Remove the class since it's now selected for assignment
+                selectedElement.querySelector('.add-org-btn').remove();
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn btn-sm btn-outline-danger remove-org-btn';
+                removeBtn.innerHTML = '<i class="bi bi-x"></i>';
+                removeBtn.addEventListener('click', () => removeOrganization(orgId));
+                
+                selectedElement.querySelector('.d-flex.justify-content-between').appendChild(removeBtn);
+                selectedContainer.appendChild(selectedElement);
+                
+                // Hide from available
+                orgElement.style.display = 'none';
+                
+                updateCounts();
+                updateSummary();
+            }
+
+            // Remove organization from selection
+            function removeOrganization(orgId) {
+                selectedOrganizations = selectedOrganizations.filter(id => id !== orgId);
+                
+                // Remove from selected container
+                const selectedElement = selectedContainer.querySelector(`[data-org-id="${orgId}"]`);
+                if (selectedElement) selectedElement.remove();
+                
+                // Show in available container
+                const availableElement = availableContainer.querySelector(`[data-org-id="${orgId}"]`);
+                if (availableElement) availableElement.style.display = 'block';
+                
+                updateCounts();
+                updateSummary();
+            }
+
+            // Update counts
+            function updateCounts() {
+                // Count only visible organizations that are NOT already assigned
+                const visibleAvailable = availableContainer.querySelectorAll('.organization-item:not([style*="display: none"]):not(.already-assigned)').length;
+                availableCountBadge.textContent = visibleAvailable;
+                selectedCountBadge.textContent = selectedOrganizations.length;
+                
+                // Show/hide empty message in selected panel
+                emptyMessage.style.display = selectedOrganizations.length === 0 ? 'block' : 'none';
+                
+                // Show/hide no search results message in available panel
+                const noSearchResults = document.getElementById('noSearchResults');
+                const hasActiveFilters = nameFilter.value.trim() !== '' || attributeFilter.value.trim() !== '';
+                const totalVisible = availableContainer.querySelectorAll('.organization-item:not([style*="display: none"])').length;
+                noSearchResults.style.display = (hasActiveFilters && totalVisible === 0) ? 'block' : 'none';
+                
+                // Update hidden input
+                selectedIdsInput.value = selectedOrganizations.join(',');
+            }
+
+            // Update summary
+            function updateSummary() {
+                if (selectedOrganizations.length > 0) {
+                    summaryAlert.style.display = 'block';
+                    summaryText.textContent = `Ready to create ${selectedOrganizations.length} assignment(s).`;
+                    createBtn.disabled = false;
+                } else {
+                    summaryAlert.style.display = 'none';
+                    createBtn.disabled = true;
+                }
+            }
+
+            // Filter organizations
+            function filterOrganizations() {
+                const nameValue = nameFilter.value.toLowerCase().trim();
+                const attributeValue = attributeFilter.value.toLowerCase().trim();
+                
+                let matchCount = 0;
+                
+                availableContainer.querySelectorAll('.organization-item').forEach(item => {
+                    const orgName = item.dataset.orgName.toLowerCase();
+                    const orgAttributes = item.dataset.orgAttributes ? item.dataset.orgAttributes.toLowerCase() : '';
+                    const isAlreadyAssigned = item.classList.contains('already-assigned');
+                    
+                    const nameMatch = !nameValue || orgName.includes(nameValue);
+                    let attributeMatch = true;
+                    
+                    // Enhanced attribute matching - check both attribute types and values
+                    if (attributeValue) {
+                        attributeMatch = orgAttributes.includes(attributeValue);
+                        
+                        // Also check individual attribute badges for more precise matching
+                        if (!attributeMatch) {
+                            const attributeBadges = item.querySelectorAll('.badge.bg-secondary');
+                            attributeMatch = Array.from(attributeBadges).some(badge => 
+                                badge.textContent.toLowerCase().includes(attributeValue)
+                            );
+                        }
+                    }
+                    
+                    const isSelected = selectedOrganizations.includes(parseInt(item.dataset.orgId));
+                    
+                    // Show if matches filters, regardless of assignment status (but don't count already assigned as "available")
+                    if (nameMatch && attributeMatch) {
+                        item.style.display = 'block';
+                        if (!isAlreadyAssigned && !isSelected) {
+                            matchCount++;
+                        }
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+                
+
+                
+                updateCounts();
+            }
+
+            // Add all visible organizations (excluding already assigned)
+            function addAllVisible() {
+                const visibleOrgs = availableContainer.querySelectorAll('.organization-item:not([style*="display: none"]):not(.already-assigned)');
+                visibleOrgs.forEach(org => addOrganization(org));
+            }
+
+            // Clear filters
+            function clearFilters() {
+                nameFilter.value = '';
+                attributeFilter.value = '';
+                filterOrganizations();
+            }
+
+            // Event listeners
+            availableContainer.addEventListener('click', function(e) {
+                if (e.target.closest('.add-org-btn')) {
+                    const orgElement = e.target.closest('.organization-item');
+                    addOrganization(orgElement);
+                }
+            });
+
+            nameFilter.addEventListener('input', filterOrganizations);
+            attributeFilter.addEventListener('input', filterOrganizations);
+            addAllBtn.addEventListener('click', addAllVisible);
+            clearFiltersBtn.addEventListener('click', clearFilters);
+
+            // Initialize
+            updateCounts();
+            updateSummary();
+        });
+    </script>
+}
+
+<style>
+    .organization-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .organization-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .organization-item:last-child {
+        border-bottom: none !important;
+    }
+    
+    /* Already assigned organizations styling */
+    .organization-item.already-assigned {
+        background-color: #f8f9fa;
+        opacity: 0.7;
+        cursor: default;
+    }
+    
+    .organization-item.already-assigned:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .organization-item.already-assigned h6 {
+        color: #6c757d;
+    }
+    
+    .add-org-btn, .remove-org-btn {
+        min-width: 32px;
+    }
+    
+    .card-body {
+        background-color: #fafafa;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+    }
+</style> 

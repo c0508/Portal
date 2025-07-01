@@ -1,0 +1,36 @@
+@using Microsoft.AspNetCore.Identity
+@using ESGPlatform.Models.Entities
+
+@inject SignInManager<User> SignInManager
+@inject UserManager<User> UserManager
+
+<ul class="navbar-nav">
+@if (SignInManager.IsSignedIn(User))
+{
+    <li class="nav-item">
+        <span class="nav-link text-dark">
+            <i class="bi bi-person-circle"></i> Hello @User.Identity?.Name!
+        </span>
+    </li>
+    <li class="nav-item">
+        <form class="form-inline" asp-controller="Account" asp-action="Logout" asp-route-returnUrl="@Url.Action("Index", "Home")">
+            <button type="submit" class="nav-link btn btn-link text-dark">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </button>
+        </form>
+    </li>
+}
+else
+{
+    <li class="nav-item">
+        <a class="nav-link text-dark" asp-controller="Account" asp-action="Register">
+            <i class="bi bi-person-plus"></i> Register
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">
+            <i class="bi bi-box-arrow-in-right"></i> Login
+        </a>
+    </li>
+}
+</ul> 
