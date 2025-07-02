@@ -17,14 +17,16 @@ public class ResponseController : BaseController
     private readonly IResponseChangeTrackingService _changeTrackingService;
     private readonly ILogger<ResponseController> _logger;
     private readonly IConditionalQuestionService _conditionalService;
+    private readonly IResponseWorkflowService _responseWorkflowService;
 
-    public ResponseController(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment, IResponseChangeTrackingService changeTrackingService, ILogger<ResponseController> logger, IConditionalQuestionService conditionalService)
+    public ResponseController(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment, IResponseChangeTrackingService changeTrackingService, ILogger<ResponseController> logger, IConditionalQuestionService conditionalService, IResponseWorkflowService responseWorkflowService)
     {
         _context = context;
         _webHostEnvironment = webHostEnvironment;
         _changeTrackingService = changeTrackingService;
         _logger = logger;
         _conditionalService = conditionalService;
+        _responseWorkflowService = responseWorkflowService;
     }
 
     // GET: Response
@@ -296,6 +298,9 @@ public class ResponseController : BaseController
 
             await _context.SaveChangesAsync();
 
+            // Update response status based on content
+            await _responseWorkflowService.UpdateStatusForAnswerAsync(response.Id, CurrentUserId!);
+
             // Track changes for existing responses
             if (!isNewResponse && originalResponse != null)
             {
@@ -423,6 +428,9 @@ public class ResponseController : BaseController
                 response.UpdatedAt = DateTime.UtcNow;
                 
                 await _context.SaveChangesAsync();
+
+                // Update response status after clearing
+                await _responseWorkflowService.UpdateStatusForAnswerAsync(response.Id, CurrentUserId!);
 
                 // Mark delegation as incomplete if this was a delegated response
                 if (isDelegatedUser)
@@ -1028,6 +1036,17 @@ public class ResponseController : BaseController
                 .ToListAsync();
         }
 
+        // Load review assignments for this campaign assignment
+        var reviewAssignments = await _context.ReviewAssignments
+            .Include(ra => ra.Reviewer)
+            .Include(ra => ra.Comments)
+            .Where(ra => ra.CampaignAssignmentId == assignment.Id)
+            .ToListAsync();
+
+        // Check if current user is a reviewer for any part of this assignment
+        bool isCurrentUserReviewer = reviewAssignments.Any(ra => ra.ReviewerId == CurrentUserId);
+        var currentUserReviewAssignments = reviewAssignments.Where(ra => ra.ReviewerId == CurrentUserId).ToList();
+
         // Filter questions if user is accessing as delegated user or has question assignments
         List<Question> questions;
         if (!string.IsNullOrEmpty(filterUserId))
@@ -1100,6 +1119,80 @@ public class ResponseController : BaseController
             // Check if question should be visible based on conditional logic
             var isVisible = questionVisibility.GetValueOrDefault(question.Id, true);
 
+            // Get review assignment data for this question with proper scope matching
+            ReviewAssignment? questionReviewAssignment = null;
+            
+            // First, look for direct question assignment
+            questionReviewAssignment = reviewAssignments.FirstOrDefault(ra => 
+                ra.Scope == ReviewScope.Question && ra.QuestionId == question.Id);
+            
+            // If no direct assignment, look for section assignment
+            if (questionReviewAssignment == null && !string.IsNullOrEmpty(question.Section))
+            {
+                questionReviewAssignment = reviewAssignments.FirstOrDefault(ra => 
+                    ra.Scope == ReviewScope.Section && ra.SectionName == (question.Section ?? "Other"));
+            }
+            
+            // If no section assignment, look for assignment-level review
+            if (questionReviewAssignment == null)
+            {
+                questionReviewAssignment = reviewAssignments.FirstOrDefault(ra => 
+                    ra.Scope == ReviewScope.Assignment);
+            }
+            
+            var reviewComments = questionReviewAssignment?.Comments?.Where(c => c.ResponseId == response?.Id).ToList() ?? new List<ReviewComment>();
+            
+            // Determine the actual review status for this specific question/response
+            ReviewStatus? actualReviewStatus = null;
+            if (questionReviewAssignment != null && response != null)
+            {
+                // For question-specific assignments, use the assignment status
+                if (questionReviewAssignment.Scope == ReviewScope.Question)
+                {
+                    actualReviewStatus = questionReviewAssignment.Status;
+                }
+                // For section or assignment-level reviews, only show approved if there are comments
+                // indicating this specific response was reviewed, or if there's a blanket approval
+                else if (questionReviewAssignment.Scope == ReviewScope.Section || 
+                         questionReviewAssignment.Scope == ReviewScope.Assignment)
+                {
+                    // Check if this specific response has review comments indicating approval
+                    var responseComments = reviewComments.Where(c => c.ResponseId == response.Id).ToList();
+                    if (responseComments.Any())
+                    {
+                        // If there are comments for this response, use the latest comment's action
+                        var latestComment = responseComments.OrderByDescending(c => c.CreatedAt).First();
+                        actualReviewStatus = latestComment.ActionTaken switch
+                        {
+                            ReviewStatus.Approved => ReviewStatus.Approved,
+                            ReviewStatus.ChangesRequested => ReviewStatus.ChangesRequested,
+                            _ => ReviewStatus.Pending
+                        };
+                    }
+                    else if (questionReviewAssignment.Status == ReviewStatus.Approved)
+                    {
+                        // Only show as approved for assignment/section level if it's a blanket approval
+                        // and the response actually has content (not just answered but empty)
+                        var hasSubstantiveResponse = !string.IsNullOrWhiteSpace(response.TextValue) ||
+                                                   response.NumericValue.HasValue ||
+                                                   response.DateValue.HasValue ||
+                                                   response.BooleanValue.HasValue ||
+                                                   (response.SelectedValues != null && !string.IsNullOrWhiteSpace(response.SelectedValues));
+                        
+                        actualReviewStatus = hasSubstantiveResponse ? ReviewStatus.Approved : null;
+                    }
+                    else
+                    {
+                        // For assignment/section level reviews without specific comments,
+                        // only show "Changes Requested" or other statuses if they apply generally
+                        // Otherwise, don't show a review status (null = pending review)
+                        actualReviewStatus = questionReviewAssignment.Status == ReviewStatus.ChangesRequested ? 
+                            null : // Don't show "Changes Requested" unless there are specific comments
+                            (questionReviewAssignment.Status == ReviewStatus.InReview ? ReviewStatus.InReview : null);
+                    }
+                }
+            }
+
             questionResponses.Add(new QuestionResponseViewModel
             {
                 // Question properties
@@ -1151,7 +1244,18 @@ public class ResponseController : BaseController
                 CanDelegate = string.IsNullOrEmpty(filterUserId),
                 
                 // Conditional logic
-                IsConditionallyVisible = isVisible
+                IsConditionallyVisible = isVisible,
+                
+                // Review assignment info - only set if there's actually a review assignment
+                IsAssignedForReview = questionReviewAssignment != null,
+                ReviewStatus = actualReviewStatus,
+                ReviewAssignmentId = questionReviewAssignment?.Id,
+                ReviewerName = questionReviewAssignment?.Reviewer?.FullName,
+                ReviewInstructions = questionReviewAssignment?.Instructions,
+                IsCurrentUserReviewer = questionReviewAssignment?.ReviewerId == CurrentUserId,
+                ReviewAssignedAt = questionReviewAssignment?.CreatedAt,
+                ReviewCommentsCount = reviewComments.Count,
+                HasUnresolvedComments = reviewComments.Any(c => !c.IsResolved)
             });
         }
 
@@ -1183,7 +1287,14 @@ public class ResponseController : BaseController
             Sections = sections, // Add the grouped sections
             CompletionPercentage = questions.Count > 0 ? 
                 (int)((double)answeredQuestions / questions.Count * 100) : 0,
-            IsDelegatedUser = !string.IsNullOrEmpty(filterUserId)
+            IsDelegatedUser = !string.IsNullOrEmpty(filterUserId),
+            
+            // Review assignment summary info
+            IsCurrentUserReviewer = isCurrentUserReviewer,
+            HasReviewAssignments = reviewAssignments.Any(),
+            ReviewAssignmentsCount = reviewAssignments.Count,
+            PendingReviewsCount = currentUserReviewAssignments.Count(ra => ra.Status == ReviewStatus.Pending),
+            CompletedReviewsCount = currentUserReviewAssignments.Count(ra => ra.Status == ReviewStatus.Completed || ra.Status == ReviewStatus.Approved)
         };
     }
 
@@ -1208,6 +1319,12 @@ public class ResponseController : BaseController
 
         return new SubmissionReviewViewModel
         {
+            AssignmentId = assignment.Id,
+            CampaignName = assignment.Campaign.Name,
+            QuestionnaireTitle = assignment.QuestionnaireVersion?.Questionnaire?.Title ?? "Unknown Questionnaire",
+            VersionNumber = assignment.QuestionnaireVersion?.VersionNumber ?? "1.0",
+            OrganizationName = assignment.TargetOrganization?.Name ?? "Unknown Organization",
+            Deadline = assignment.Campaign.Deadline,
             Assignment = assignment,
             QuestionSummaries = questionSummaries,
             TotalQuestions = questions.Count,

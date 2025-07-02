@@ -110,12 +110,19 @@ else
                             <a asp-action="ViewAssignment" asp-route-id="@assignment.Id" class="btn btn-outline-primary btn-sm" title="View Responses">
                                 <i class="bi bi-eye"></i> View
                             </a>
-                            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin") || User.IsInRole("CampaignManager") || User.IsInRole("LeadResponder"))
                             {
                                 <a asp-controller="QuestionAssignment" asp-action="Manage" asp-route-id="@assignment.Id"
                                    class="btn btn-outline-success btn-sm" title="Manage Question Assignments">
                                     <i class="bi bi-person-plus"></i> Questions
                                 </a>
+                                <a asp-controller="Review" asp-action="AssignReviewer" asp-route-id="@assignment.Id"
+                                   class="btn btn-outline-info btn-sm" title="Assign Reviewers">
+                                    <i class="bi bi-clipboard-check"></i> Reviews
+                                </a>
+                            }
+                            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                            {
                                 <a asp-action="EditAssignment" asp-route-id="@assignment.Id" class="btn btn-outline-secondary btn-sm" title="Edit Assignment">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>

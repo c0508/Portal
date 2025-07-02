@@ -26,12 +26,25 @@ public class ReviewService
         string assignedById,
         string? instructions = null)
     {
+        // Check if this reviewer is already assigned to this question
+        var existingAssignment = await _context.ReviewAssignments
+            .FirstOrDefaultAsync(ra => ra.CampaignAssignmentId == campaignAssignmentId && 
+                                      ra.ReviewerId == reviewerId && 
+                                      ra.QuestionId == questionId &&
+                                      ra.Scope == ReviewScope.Question);
+
+        if (existingAssignment != null)
+        {
+            throw new InvalidOperationException($"Reviewer is already assigned to this question. Existing assignment ID: {existingAssignment.Id}");
+        }
+
         var reviewAssignment = new ReviewAssignment
         {
             CampaignAssignmentId = campaignAssignmentId,
             ReviewerId = reviewerId,
             Scope = ReviewScope.Question,
             QuestionId = questionId,
+            SectionName = null, // Explicitly set to null for Question scope
             Status = ReviewStatus.Pending,
             Instructions = instructions,
             AssignedById = assignedById,
@@ -40,13 +53,24 @@ public class ReviewService
 
         _context.ReviewAssignments.Add(reviewAssignment);
         
-        // Log the assignment
-        await LogReviewActionAsync(campaignAssignmentId, questionId, null, reviewAssignment.Id, 
-            assignedById, "ReviewAssigned", null, "Pending", 
-            $"Reviewer {reviewerId} assigned to question {questionId}");
+        try
+        {
+            await _context.SaveChangesAsync();
+            
+            // Log the assignment after successful save
+            await LogReviewActionAsync(campaignAssignmentId, questionId, null, reviewAssignment.Id, 
+                assignedById, "ReviewAssigned", null, "Pending", 
+                $"Reviewer {reviewerId} assigned to question {questionId}");
 
-        await _context.SaveChangesAsync();
-        return reviewAssignment;
+            await _context.SaveChangesAsync();
+            return reviewAssignment;
+        }
+        catch (Exception ex)
+        {
+            // Remove the added entity if save failed
+            _context.ReviewAssignments.Remove(reviewAssignment);
+            throw new InvalidOperationException($"Failed to save review assignment: {ex.Message}", ex);
+        }
     }
 
     /// <summary>
@@ -91,11 +115,24 @@ public class ReviewService
         string assignedById,
         string? instructions = null)
     {
+        // Check if this reviewer is already assigned to this assignment with the same scope
+        var existingAssignment = await _context.ReviewAssignments
+            .FirstOrDefaultAsync(ra => ra.CampaignAssignmentId == campaignAssignmentId && 
+                                      ra.ReviewerId == reviewerId && 
+                                      ra.Scope == ReviewScope.Assignment);
+
+        if (existingAssignment != null)
+        {
+            throw new InvalidOperationException($"Reviewer is already assigned to this assignment. Existing assignment ID: {existingAssignment.Id}");
+        }
+
         var reviewAssignment = new ReviewAssignment
         {
             CampaignAssignmentId = campaignAssignmentId,
             ReviewerId = reviewerId,
             Scope = ReviewScope.Assignment,
+            QuestionId = null,  // Explicitly set to null for Assignment scope
+            SectionName = null, // Explicitly set to null for Assignment scope
             Status = ReviewStatus.Pending,
             Instructions = instructions,
             AssignedById = assignedById,
@@ -104,13 +141,24 @@ public class ReviewService
 
         _context.ReviewAssignments.Add(reviewAssignment);
         
-        // Log the assignment
-        await LogReviewActionAsync(campaignAssignmentId, null, null, reviewAssignment.Id, 
-            assignedById, "ReviewAssigned", null, "Pending", 
-            $"Reviewer {reviewerId} assigned to entire assignment");
-
-        await _context.SaveChangesAsync();
-        return reviewAssignment;
+        try
+        {
+            await _context.SaveChangesAsync();
+            
+            // Log the assignment after successful save
+            await LogReviewActionAsync(campaignAssignmentId, null, null, reviewAssignment.Id, 
+                assignedById, "ReviewAssigned", null, "Pending", 
+                $"Reviewer {reviewerId} assigned to entire assignment");
+                
+            await _context.SaveChangesAsync();
+            return reviewAssignment;
+        }
+        catch (Exception ex)
+        {
+            // Remove the added entity if save failed
+            _context.ReviewAssignments.Remove(reviewAssignment);
+            throw new InvalidOperationException($"Failed to save review assignment: {ex.Message}", ex);
+        }
     }
 
     #endregion

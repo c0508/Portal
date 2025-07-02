@@ -32,6 +32,27 @@
                     </div>
                     
                     <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label asp-for="Status" class="form-label"></label>
+                            <select asp-for="Status" class="form-select">
+                                <option value="@ESGPlatform.Models.Entities.CampaignStatus.Draft">Draft</option>
+                                <option value="@ESGPlatform.Models.Entities.CampaignStatus.Active">Open</option>
+                                <option value="@ESGPlatform.Models.Entities.CampaignStatus.Paused">Paused</option>
+                                <option value="@ESGPlatform.Models.Entities.CampaignStatus.Completed">Closed</option>
+                                <option value="@ESGPlatform.Models.Entities.CampaignStatus.Cancelled">Cancelled</option>
+                            </select>
+                            <span asp-validation-for="Status" class="text-danger"></span>
+                            <div class="form-text">
+                                <strong>Draft:</strong> Campaign is being prepared<br/>
+                                <strong>Open:</strong> Campaign is active and accepting responses<br/>
+                                <strong>Paused:</strong> Temporarily stopped<br/>
+                                <strong>Closed:</strong> Campaign completed (use Close Campaign button instead)<br/>
+                                <strong>Cancelled:</strong> Campaign abandoned
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
                         <div class="col-md-4 mb-3">
                             <label asp-for="StartDate" class="form-label"></label>
                             <input asp-for="StartDate" class="form-control" type="date" />

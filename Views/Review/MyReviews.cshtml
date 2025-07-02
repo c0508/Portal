@@ -1,0 +1,238 @@
+@model List<ESGPlatform.Models.ViewModels.ReviewAssignmentViewModel>
+@{
+    ViewData["Title"] = "My Reviews";
+}
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-clipboard-check"></i> My Reviews</h2>
+                    <p class="text-muted mb-0">Review assignments assigned to you</p>
+                </div>
+                <div>
+                    <a asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="h4 text-warning">@Model.Count(r => r.Status == "Pending")</div>
+                    <div class="text-muted">Pending Reviews</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="h4 text-info">@Model.Count(r => r.Status == "InReview")</div>
+                    <div class="text-muted">In Progress</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="h4 text-success">@Model.Count(r => r.Status == "Approved")</div>
+                    <div class="text-muted">Approved</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <div class="h4 text-danger">@Model.Count(r => r.Status == "ChangesRequested")</div>
+                    <div class="text-muted">Changes Requested</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Assignments -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-list-task"></i> Review Assignments</h5>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="all" checked>
+                            <label class="btn btn-outline-secondary" for="filterAll">All</label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterPending" value="Pending">
+                            <label class="btn btn-outline-warning" for="filterPending">Pending</label>
+                            
+                            <input type="radio" class="btn-check" name="statusFilter" id="filterInReview" value="InReview">
+                            <label class="btn btn-outline-info" for="filterInReview">In Review</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (Model.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Campaign</th>
+                                        <th>Question/Section</th>
+                                        <th>Target Organization</th>
+                                        <th>Status</th>
+                                        <th>Assigned</th>
+                                        <th>Due Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var assignment in Model.OrderBy(a => a.CreatedAt))
+                                    {
+                                        <tr class="review-row" data-status="@assignment.Status">
+                                            <td>
+                                                <div class="fw-semibold">@assignment.CampaignName</div>
+                                                <small class="text-muted">@assignment.QuestionnaireTitle</small>
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(assignment.QuestionText))
+                                                {
+                                                    <div class="fw-semibold">Q@(assignment.QuestionDisplayOrder)</div>
+                                                    <small class="text-muted">@(assignment.QuestionText.Length > 50 ? assignment.QuestionText.Substring(0, 50) + "..." : assignment.QuestionText)</small>
+                                                }
+                                                else
+                                                {
+                                                    <div class="fw-semibold">Section: @assignment.SectionName</div>
+                                                    <small class="text-muted">Multiple questions</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                @assignment.TargetOrganizationName
+                                            </td>
+                                            <td>
+                                                @switch (assignment.Status)
+                                                {
+                                                    case "Pending":
+                                                        <span class="badge bg-warning">Pending</span>
+                                                        break;
+                                                    case "InReview":
+                                                        <span class="badge bg-info">In Review</span>
+                                                        break;
+                                                    case "Approved":
+                                                        <span class="badge bg-success">Approved</span>
+                                                        break;
+                                                    case "ChangesRequested":
+                                                        <span class="badge bg-danger">Changes Requested</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge bg-secondary">@assignment.Status</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td>
+                                                <small>@assignment.CreatedAt.ToString("MMM dd, yyyy")</small>
+                                            </td>
+                                            <td>
+                                                @if (assignment.DueDate.HasValue)
+                                                {
+                                                    var isOverdue = assignment.DueDate.Value < DateTime.Now;
+                                                    <small class="@(isOverdue ? "text-danger fw-bold" : "")">
+                                                        @assignment.DueDate.Value.ToString("MMM dd, yyyy")
+                                                    </small>
+                                                    if (isOverdue)
+                                                    {
+                                                        <br><small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Overdue</small>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <small class="text-muted">No due date</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (assignment.Status == "Pending" || assignment.Status == "InReview")
+                                                {
+                                                    <a asp-action="ReviewQuestions" asp-route-id="@assignment.Id" class="btn btn-primary btn-sm">
+                                                        <i class="bi bi-eye"></i> Review
+                                                    </a>
+                                                }
+                                                else if (assignment.Status == "Approved" || assignment.Status == "ChangesRequested")
+                                                {
+                                                    <a asp-action="ReviewQuestions" asp-route-id="@assignment.Id" class="btn btn-outline-secondary btn-sm">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </a>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-clipboard-x display-1 text-muted"></i>
+                            <h5 class="mt-3">No Review Assignments</h5>
+                            <p class="text-muted">You don't have any review assignments at this time.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Filter functionality
+            $('input[name="statusFilter"]').change(function() {
+                var selectedStatus = $(this).val();
+                
+                if (selectedStatus === 'all') {
+                    $('.review-row').show();
+                } else {
+                    $('.review-row').hide();
+                    $('.review-row[data-status="' + selectedStatus + '"]').show();
+                }
+                
+                // Update visible count
+                var visibleCount = $('.review-row:visible').length;
+                var totalCount = $('.review-row').length;
+                
+                // Update statistics if needed
+                updateFilterStatistics(selectedStatus);
+            });
+            
+            function updateFilterStatistics(status) {
+                // Optional: Update statistics based on filter
+                // This can be enhanced to show filtered counts
+            }
+        });
+    </script>
+    <style>
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border: 1px solid rgba(0, 0, 0, 0.125);
+        }
+        .table th {
+            border-top: none;
+            font-weight: 600;
+        }
+        .review-row {
+            transition: opacity 0.3s ease;
+        }
+        .btn-check:checked + .btn {
+            background-color: var(--bs-primary);
+            border-color: var(--bs-primary);
+            color: white;
+        }
+    </style>
+} 

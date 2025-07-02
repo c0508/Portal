@@ -3,6 +3,19 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ESGPlatform.Models.Entities;
 
+public enum ResponseStatus
+{
+    NotStarted = 0,
+    PrePopulated = 1,
+    Draft = 2,
+    Answered = 3,
+    SubmittedForReview = 4,
+    UnderReview = 5,
+    ChangesRequested = 6,
+    ReviewApproved = 7,
+    Final = 8
+}
+
 public class Response
 {
     [Key]
@@ -31,6 +44,18 @@ public class Response
     [Column(TypeName = "nvarchar(max)")]
     public string? SelectedValues { get; set; }
 
+    // Response Status Management
+    public ResponseStatus Status { get; set; } = ResponseStatus.NotStarted;
+    public DateTime? StatusUpdatedAt { get; set; }
+    
+    [StringLength(450)]
+    public string? StatusUpdatedById { get; set; }
+
+    // Pre-population tracking
+    public bool IsPrePopulated { get; set; } = false;
+    public int? SourceResponseId { get; set; } // Reference to the original response this was copied from
+    public bool IsPrePopulatedAccepted { get; set; } = false; // Whether user has accepted the pre-populated value
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
@@ -44,9 +69,16 @@ public class Response
     [ForeignKey(nameof(ResponderId))]
     public virtual User Responder { get; set; } = null!;
 
+    [ForeignKey(nameof(SourceResponseId))]
+    public virtual Response? SourceResponse { get; set; }
+
+    [ForeignKey(nameof(StatusUpdatedById))]
+    public virtual User? StatusUpdatedBy { get; set; }
+
     public virtual ICollection<ResponseChange> Changes { get; set; } = new List<ResponseChange>();
     public virtual ICollection<FileUpload> FileUploads { get; set; } = new List<FileUpload>();
     public virtual ICollection<ResponseOverride> Overrides { get; set; } = new List<ResponseOverride>();
+    public virtual ICollection<ResponseStatusHistory> StatusHistory { get; set; } = new List<ResponseStatusHistory>();
 }
 
 public class ResponseChange
@@ -154,4 +186,35 @@ public class FileUpload
 
     [ForeignKey(nameof(UploadedById))]
     public virtual User UploadedBy { get; set; } = null!;
+}
+
+public class ResponseStatusHistory
+{
+    [Key]
+    public int Id { get; set; }
+
+    [Required]
+    public int ResponseId { get; set; }
+
+    [Required]
+    public ResponseStatus FromStatus { get; set; }
+
+    [Required]
+    public ResponseStatus ToStatus { get; set; }
+
+    [Required]
+    [StringLength(450)]
+    public string ChangedById { get; set; } = string.Empty;
+
+    [StringLength(1000)]
+    public string? ChangeReason { get; set; }
+
+    public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
+
+    // Navigation properties
+    [ForeignKey(nameof(ResponseId))]
+    public virtual Response Response { get; set; } = null!;
+
+    [ForeignKey(nameof(ChangedById))]
+    public virtual User ChangedBy { get; set; } = null!;
 } 

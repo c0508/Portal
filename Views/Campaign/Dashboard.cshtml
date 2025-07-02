@@ -1,0 +1,916 @@
+@model ESGPlatform.Models.ViewModels.CampaignDashboardViewModel
+@{
+    ViewData["Title"] = "Campaign Dashboard";
+}
+
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1><i class="bi bi-speedometer2"></i> Campaign Dashboard</h1>
+            <p class="text-muted mb-0">Overview of campaign progress and key performance indicators</p>
+        </div>
+        <div>
+            <a asp-action="Index" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-list"></i> All Campaigns
+            </a>
+            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+            {
+                <a asp-action="Create" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> New Campaign
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- Dashboard Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">@Model.Summary.TotalActiveCampaigns</h2>
+                            <p class="mb-0">Open Campaigns</p>
+                        </div>
+                        <i class="bi bi-megaphone fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">@Model.Summary.TotalAssignments</h2>
+                            <p class="mb-0">Total Assignments</p>
+                        </div>
+                        <i class="bi bi-list-task fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">@Model.Summary.OverallCompletionRate.ToString("F1")%</h2>
+                            <p class="mb-0">Completion Rate</p>
+                        </div>
+                        <i class="bi bi-check-circle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="mb-0">@Model.Summary.TotalOverdueAssignments</h2>
+                            <p class="mb-0">Overdue Assignments</p>
+                        </div>
+                        <i class="bi bi-exclamation-triangle fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Metrics and Charts Row -->
+    <div class="row mb-4">
+        <!-- Overall Progress Metrics -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-graph-up"></i> Progress Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <h4 class="text-primary">@Model.ProgressMetrics.TotalQuestionsAnswered</h4>
+                            <small class="text-muted">Questions Answered</small>
+                        </div>
+                        <div class="col-6">
+                            <h4 class="text-info">@Model.ProgressMetrics.ActiveRespondents</h4>
+                            <small class="text-muted">Active Respondents</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small">Response Rate</label>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: @Model.ProgressMetrics.OverallResponseRate%" 
+                                 aria-valuenow="@Model.ProgressMetrics.OverallResponseRate" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                        <small class="text-muted">@Model.ProgressMetrics.OverallResponseRate.ToString("F1")%</small>
+                    </div>
+
+                    @if (Model.ProgressMetrics.AverageResponseTimeHours > 0)
+                    {
+                        <div class="row text-center">
+                            <div class="col-12">
+                                <h5 class="text-secondary">@Model.ProgressMetrics.AverageResponseTimeHours.ToString("F1") hrs</h5>
+                                <small class="text-muted">Average Response Time</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Progress Chart -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-bar-chart"></i> Weekly Progress Trend</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.ProgressMetrics.WeeklyProgress.Any())
+                    {
+                        <canvas id="weeklyProgressChart" style="max-height: 200px;"></canvas>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-graph-up fs-1"></i>
+                            <p class="mt-2">No data available yet</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Campaigns and Campaign Performance -->
+    <div class="row mb-4">
+        <!-- Active Campaigns -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-lightning"></i> Open Campaigns</h5>
+                    <span class="badge bg-primary">@Model.ActiveCampaigns.Count campaigns</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.ActiveCampaigns.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Campaign</th>
+                                        <th>Progress</th>
+                                        <th>Deadline</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var campaign in Model.ActiveCampaigns.Take(10))
+                                    {
+                                        <tr class="@(campaign.IsOverdue ? "table-danger" : campaign.IsNearDeadline ? "table-warning" : "")">
+                                            <td>
+                                                <div>
+                                                    <strong>@campaign.Name</strong>
+                                                    <br>
+                                                    <small class="text-muted">@campaign.OrganizationName</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="progress mb-1" style="height: 6px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: @campaign.CompletionPercentage%" 
+                                                         aria-valuenow="@campaign.CompletionPercentage" 
+                                                         aria-valuemin="0" aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">@campaign.CompletedAssignments/@campaign.TotalAssignments completed</small>
+                                            </td>
+                                            <td>
+                                                @if (campaign.Deadline.HasValue)
+                                                {
+                                                    <div>
+                                                        @campaign.Deadline.Value.ToString("MMM dd, yyyy")
+                                                        @if (campaign.IsOverdue)
+                                                        {
+                                                            <br><span class="badge bg-danger">Overdue</span>
+                                                        }
+                                                        else if (campaign.IsNearDeadline)
+                                                        {
+                                                            <br><span class="badge bg-warning">@campaign.DaysRemaining days left</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <br><small class="text-muted">@campaign.DaysRemaining days remaining</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No deadline</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @{
+                                                    var statusText = campaign.Status switch {
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Draft => "Draft",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Active => "Open",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Paused => "Paused", 
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Completed => "Closed",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "Cancelled",
+                                                        _ => campaign.Status.ToString()
+                                                    };
+                                                    var statusClass = campaign.Status switch {
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Draft => "secondary",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Active => "success",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Paused => "warning",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Completed => "primary",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "danger",
+                                                        _ => "secondary"
+                                                    };
+                                                }
+                                                <span class="badge bg-@statusClass">@statusText</span>
+                                            </td>
+                                            <td>
+                                                <a asp-action="Details" asp-route-id="@campaign.Id" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                                                {
+                                                    <a asp-action="ManageAssignments" asp-route-id="@campaign.Id" class="btn btn-sm btn-outline-info">
+                                                        <i class="bi bi-people"></i>
+                                                    </a>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        @if (Model.ActiveCampaigns.Count > 10)
+                        {
+                            <div class="text-center mt-3">
+                                <a asp-action="Index" class="btn btn-outline-primary">
+                                    View All @Model.ActiveCampaigns.Count Active Campaigns
+                                </a>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-megaphone fs-1"></i>
+                            <p class="mt-2">No open campaigns</p>
+                            @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+                            {
+                                <a asp-action="Create" class="btn btn-primary">Create First Campaign</a>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaign Performance -->
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-trophy"></i> Campaign Performance</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.CampaignPerformance.Any())
+                    {
+                        @foreach (var performance in Model.CampaignPerformance.Take(5))
+                        {
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">@performance.CampaignName</div>
+                                    <div class="progress mt-1" style="height: 4px;">
+                                        <div class="progress-bar bg-@performance.PerformanceColor" role="progressbar" 
+                                             style="width: @performance.CompletionRate%" 
+                                             aria-valuenow="@performance.CompletionRate" 
+                                             aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">@performance.CompletionRate.ToString("F1")% complete</small>
+                                </div>
+                                <div class="ms-2">
+                                    <span class="badge bg-@performance.PerformanceColor">@performance.PerformanceIndicator</span>
+                                </div>
+                            </div>
+                        }
+                        
+                        @if (Model.CampaignPerformance.Count > 5)
+                        {
+                            <div class="text-center">
+                                <a asp-action="Index" class="btn btn-sm btn-outline-primary">View All</a>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-trophy fs-1"></i>
+                            <p class="mt-2">No performance data</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignment Status Distribution -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-pie-chart"></i> Assignment Status Distribution</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.StatusDistribution.TotalAssignments > 0)
+                    {
+                        <canvas id="statusDistributionChart" style="max-height: 250px;"></canvas>
+                        <div class="mt-3">
+                            @foreach (var status in Model.StatusDistribution.StatusItems.Where(s => s.Count > 0))
+                            {
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge bg-@status.Color">@status.Status</span>
+                                    <small class="text-muted">@status.Count (@status.Percentage.ToString("F1")%)</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-pie-chart fs-1"></i>
+                            <p class="mt-2">No assignments yet</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <!-- Key Performance Indicators -->
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5><i class="bi bi-speedometer"></i> Key Performance Indicators</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h4 class="text-success">@Model.StatusDistribution.CompletionRate.ToString("F1")%</h4>
+                                <small class="text-muted">Overall Completion</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h4 class="text-info">@Model.StatusDistribution.ActiveCompletionRate.ToString("F1")%</h4>
+                                <small class="text-muted">Active Progress</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h4 class="text-warning">@Model.StatusDistribution.OverdueCount</h4>
+                                <small class="text-muted">Overdue</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-primary">@Model.StatusDistribution.InProgressCount</h4>
+                            <small class="text-muted">In Progress</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Company Assignment Breakdown -->
+    @if (Model.CompanyBreakdown.Any())
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-building"></i> Company Assignment Status</h5>
+                        <span class="badge bg-info">@Model.CompanyBreakdown.Count companies</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>Type & Attributes</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                        <th>Responders</th>
+                                        <th>Performance</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var company in Model.CompanyBreakdown.Take(15))
+                                    {
+                                        <tr class="@(company.IsAtRisk ? "table-warning" : company.HasOverdueAssignments ? "table-danger" : "")">
+                                            <td>
+                                                <div>
+                                                    <strong>@company.OrganizationName</strong>
+                                                    <br>
+                                                    <small class="text-muted">@company.RelationshipType</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <span class="badge bg-secondary mb-1">@company.OrganizationType</span>
+                                                    @foreach (var attr in company.Attributes.Take(2))
+                                                    {
+                                                        <br><small class="text-muted">@attr.AttributeType: @attr.Value</small>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="progress mb-1" style="height: 6px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: @company.CompletionRate%" 
+                                                         aria-valuenow="@company.CompletionRate" 
+                                                         aria-valuemin="0" aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">@company.CompletedAssignments/@company.TotalAssignments completed</small>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @if (company.InProgressAssignments > 0)
+                                                    {
+                                                        <span class="badge bg-warning">@company.InProgressAssignments In Progress</span>
+                                                    }
+                                                    @if (company.NotStartedAssignments > 0)
+                                                    {
+                                                        <span class="badge bg-secondary">@company.NotStartedAssignments Not Started</span>
+                                                    }
+                                                    @if (company.OverdueAssignments > 0)
+                                                    {
+                                                        <span class="badge bg-danger">@company.OverdueAssignments Overdue</span>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <strong>@company.ActiveResponders/@company.TotalResponders</strong>
+                                                    <br>
+                                                    <small class="text-muted">Active/Total</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    @if (company.LastResponseDate.HasValue)
+                                                    {
+                                                        <small class="text-muted">
+                                                            Last: @company.LastResponseDate.Value.ToString("MMM dd")
+                                                        </small>
+                                                    }
+                                                    @if (company.AverageResponseTimeHours.HasValue)
+                                                    {
+                                                        <br><small class="text-muted">
+                                                            Avg: @company.AverageResponseTimeHours.Value.ToString("F1")h
+                                                        </small>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" type="button" 
+                                                        data-bs-toggle="collapse" 
+                                                        data-bs-target="#company-@company.OrganizationId" 
+                                                        aria-expanded="false">
+                                                    <i class="bi bi-eye"></i> Details
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr class="collapse" id="company-@company.OrganizationId">
+                                            <td colspan="7" class="bg-light">
+                                                <div class="p-3">
+                                                    <h6>Campaign Assignments for @company.OrganizationName</h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Campaign</th>
+                                                                    <th>Status</th>
+                                                                    <th>Progress</th>
+                                                                    <th>Lead Responder</th>
+                                                                    <th>Deadline</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var assignment in company.CampaignAssignments)
+                                                                {
+                                                                    <tr class="@(assignment.IsOverdue ? "table-danger" : "")">
+                                                                        <td>@assignment.CampaignName</td>
+                                                                        <td>
+                                                                            <span class="badge bg-@(assignment.AssignmentStatus == ESGPlatform.Models.Entities.AssignmentStatus.Submitted || assignment.AssignmentStatus == ESGPlatform.Models.Entities.AssignmentStatus.Approved ? "success" : "warning")">
+                                                                                @assignment.AssignmentStatus
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            <div class="progress" style="height: 4px; width: 100px;">
+                                                                                <div class="progress-bar bg-success" role="progressbar" 
+                                                                                     style="width: @assignment.ProgressPercentage%">
+                                                                                </div>
+                                                                            </div>
+                                                                            <small>@assignment.QuestionsAnswered/@assignment.TotalQuestions</small>
+                                                                        </td>
+                                                                        <td>@(assignment.LeadResponderName ?? "Not assigned")</td>
+                                                                        <td>
+                                                                            @if (assignment.Deadline.HasValue)
+                                                                            {
+                                                                                <span class="@(assignment.IsOverdue ? "text-danger" : "")">
+                                                                                    @assignment.Deadline.Value.ToString("MMM dd, yyyy")
+                                                                                </span>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <span class="text-muted">No deadline</span>
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Responder Workload Analysis -->
+    @if (Model.ResponderBreakdown.Any())
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5><i class="bi bi-people"></i> Responder Workload Analysis</h5>
+                        <span class="badge bg-success">@Model.ResponderBreakdown.Count responders</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Responder</th>
+                                        <th>Organization</th>
+                                        <th>Workload</th>
+                                        <th>Progress</th>
+                                        <th>Performance</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var responder in Model.ResponderBreakdown.Take(15))
+                                    {
+                                        <tr class="@(responder.IsOverloaded ? "table-warning" : responder.IsInactive ? "table-light" : "")">
+                                            <td>
+                                                <div>
+                                                    <strong>@responder.UserName</strong>
+                                                    <br>
+                                                    <small class="text-muted">@responder.UserEmail</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    @responder.OrganizationName
+                                                    <br>
+                                                    <small class="text-muted">@responder.UserRole</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    <span class="badge bg-@responder.WorkloadColor">@responder.WorkloadIndicator</span>
+                                                    <br>
+                                                    <small class="text-muted">@responder.TotalAssignments total</small>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="progress mb-1" style="height: 6px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: @responder.CompletionRate%" 
+                                                         aria-valuenow="@responder.CompletionRate" 
+                                                         aria-valuemin="0" aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">@responder.CompletedAssignments/@responder.TotalAssignments completed</small>
+                                            </td>
+                                            <td>
+                                                <div>
+                                                    @if (responder.LastActivityDate.HasValue)
+                                                    {
+                                                        <small class="text-muted">
+                                                            Last: @responder.LastActivityDate.Value.ToString("MMM dd")
+                                                        </small>
+                                                    }
+                                                    @if (responder.AverageResponseTimeHours.HasValue)
+                                                    {
+                                                        <br><small class="text-muted">
+                                                            Avg: @responder.AverageResponseTimeHours.Value.ToString("F1")h
+                                                        </small>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @if (responder.InProgressAssignments > 0)
+                                                    {
+                                                        <span class="badge bg-warning">@responder.InProgressAssignments Active</span>
+                                                    }
+                                                    @if (responder.OverdueAssignments > 0)
+                                                    {
+                                                        <span class="badge bg-danger">@responder.OverdueAssignments Overdue</span>
+                                                    }
+                                                    @if (responder.DelegatedAssignments > 0)
+                                                    {
+                                                        <span class="badge bg-info">@responder.DelegatedAssignments Delegated</span>
+                                                    }
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" type="button" 
+                                                        data-bs-toggle="collapse" 
+                                                        data-bs-target="#responder-@responder.UserId.Replace(".", "")" 
+                                                        aria-expanded="false">
+                                                    <i class="bi bi-eye"></i> Details
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr class="collapse" id="responder-@responder.UserId.Replace(".", "")">
+                                            <td colspan="7" class="bg-light">
+                                                <div class="p-3">
+                                                    <h6>Assignment Details for @responder.UserName</h6>
+                                                    <div class="table-responsive">
+                                                        <table class="table table-sm">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Campaign</th>
+                                                                    <th>Organization</th>
+                                                                    <th>Status</th>
+                                                                    <th>Progress</th>
+                                                                    <th>Role</th>
+                                                                    <th>Deadline</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var assignment in responder.AssignmentDetails)
+                                                                {
+                                                                    <tr class="@(assignment.IsOverdue ? "table-danger" : "")">
+                                                                        <td>@assignment.CampaignName</td>
+                                                                        <td>@assignment.OrganizationName</td>
+                                                                        <td>
+                                                                            <span class="badge bg-@(assignment.Status == ESGPlatform.Models.Entities.AssignmentStatus.Submitted || assignment.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved ? "success" : "warning")">
+                                                                                @assignment.Status
+                                                                            </span>
+                                                                        </td>
+                                                                        <td>
+                                                                            <div class="progress" style="height: 4px; width: 100px;">
+                                                                                <div class="progress-bar bg-success" role="progressbar" 
+                                                                                     style="width: @assignment.ProgressPercentage%">
+                                                                                </div>
+                                                                            </div>
+                                                                            <small>@assignment.QuestionsAnswered/@assignment.TotalQuestions</small>
+                                                                        </td>
+                                                                        <td>
+                                                                            @if (assignment.IsLeadResponder)
+                                                                            {
+                                                                                <span class="badge bg-primary">Lead</span>
+                                                                            }
+                                                                            @if (assignment.IsDelegated)
+                                                                            {
+                                                                                <span class="badge bg-info">Delegated</span>
+                                                                            }
+                                                                        </td>
+                                                                        <td>
+                                                                            @if (assignment.Deadline.HasValue)
+                                                                            {
+                                                                                <span class="@(assignment.IsOverdue ? "text-danger" : "")">
+                                                                                    @assignment.Deadline.Value.ToString("MMM dd, yyyy")
+                                                                                </span>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <span class="text-muted">No deadline</span>
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Recent Activity -->
+    @if (Model.RecentCampaigns.Any())
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-clock-history"></i> Recent Activity</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            @foreach (var campaign in Model.RecentCampaigns)
+                            {
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card border-left-@(campaign.Status == ESGPlatform.Models.Entities.CampaignStatus.Completed ? "success" : "primary") h-100">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="card-title mb-0">@campaign.Name</h6>
+                                                @{
+                                                    var recentStatusText = campaign.Status switch {
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Draft => "Draft",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Active => "Open",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Paused => "Paused", 
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Completed => "Closed",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "Cancelled",
+                                                        _ => campaign.Status.ToString()
+                                                    };
+                                                    var recentStatusClass = campaign.Status switch {
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Draft => "secondary",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Active => "success",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Paused => "warning",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Completed => "primary",
+                                                        ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "danger",
+                                                        _ => "secondary"
+                                                    };
+                                                }
+                                                <span class="badge bg-@recentStatusClass">@recentStatusText</span>
+                                            </div>
+                                            <p class="text-muted small mb-2">@campaign.OrganizationName</p>
+                                            
+                                            @if (campaign.TotalAssignments > 0)
+                                            {
+                                                <div class="progress mb-2" style="height: 4px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: @campaign.CompletionPercentage%" 
+                                                         aria-valuenow="@campaign.CompletionPercentage" 
+                                                         aria-valuemin="0" aria-valuemax="100">
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">@campaign.CompletedAssignments/@campaign.TotalAssignments assignments</small>
+                                            }
+                                            
+                                            <div class="mt-2">
+                                                <small class="text-muted">
+                                                    <i class="bi bi-calendar"></i> @campaign.CreatedAt.ToString("MMM dd, yyyy")
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Status Distribution Chart
+        @if (Model.StatusDistribution.TotalAssignments > 0)
+        {
+            <text>
+            const statusCtx = document.getElementById('statusDistributionChart').getContext('2d');
+            const statusChart = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [@Html.Raw(string.Join(",", Model.StatusDistribution.StatusItems.Where(s => s.Count > 0).Select(s => $"'{s.Status}'")))],
+                    datasets: [{
+                        data: [@string.Join(",", Model.StatusDistribution.StatusItems.Where(s => s.Count > 0).Select(s => s.Count))],
+                        backgroundColor: [
+                            '#6c757d', // secondary - Not Started
+                            '#ffc107', // warning - In Progress
+                            '#17a2b8', // info - Submitted
+                            '#007bff', // primary - Under Review
+                            '#28a745', // success - Approved
+                            '#dc3545'  // danger - Changes Requested
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+            </text>
+        }
+
+        // Weekly Progress Chart
+        @if (Model.ProgressMetrics.WeeklyProgress.Any())
+        {
+            <text>
+            const weeklyCtx = document.getElementById('weeklyProgressChart').getContext('2d');
+            const weeklyChart = new Chart(weeklyCtx, {
+                type: 'line',
+                data: {
+                    labels: [@Html.Raw(string.Join(",", Model.ProgressMetrics.WeeklyProgress.Select(w => $"'{w.WeekLabel}'")))],
+                    datasets: [{
+                        label: 'Completion Rate',
+                        data: [@string.Join(",", Model.ProgressMetrics.WeeklyProgress.Select(w => w.CompletionRate.ToString("F1")))],
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }, {
+                        label: 'Responses Received',
+                        data: [@string.Join(",", Model.ProgressMetrics.WeeklyProgress.Select(w => w.ResponsesReceived))],
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.1,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: false,
+                            position: 'right',
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            </text>
+        }
+    </script>
+}
+
+<style>
+    .border-left-primary {
+        border-left: 4px solid #007bff !important;
+    }
+    .border-left-success {
+        border-left: 4px solid #28a745 !important;
+    }
+    .border-left-warning {
+        border-left: 4px solid #ffc107 !important;
+    }
+    .border-left-danger {
+        border-left: 4px solid #dc3545 !important;
+    }
+</style> 

@@ -51,7 +51,7 @@
         </div>
     </div>
 
-    <!-- Progress Bar -->
+                        <!-- Progress Bar -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -66,16 +66,43 @@
                     </div>
                     <div class="mt-2 d-flex justify-content-between">
                         <small class="text-muted">@Model.ProgressPercentage% complete</small>
-                        @if (Model.Status == AssignmentStatus.InProgress && Model.CanSubmit)
-                        {
-                            <form asp-action="ReviewSubmission" method="get" class="d-inline">
-                                <input type="hidden" name="id" value="@Model.AssignmentId" />
-                                <button type="submit" class="btn btn-success btn-sm">
-                                    <i class="bi bi-check-circle"></i> Review & Submit
-                                </button>
-                            </form>
-                        }
+                        <div>
+                            @if (Model.Status == AssignmentStatus.InProgress && Model.CanSubmit)
+                            {
+                                <form asp-action="ReviewSubmission" method="get" class="d-inline">
+                                    <input type="hidden" name="id" value="@Model.AssignmentId" />
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="bi bi-check-circle"></i> Review & Submit
+                                    </button>
+                                </form>
+                            }
+                            @if (Model.CanAccessReviews && Model.HasPendingReviews)
+                            {
+                                <a asp-controller="Review" asp-action="AssignReviewer" asp-route-id="@Model.AssignmentId" 
+                                   class="btn btn-outline-warning btn-sm ms-2">
+                                    <i class="bi bi-clipboard-check"></i> Manage Reviews (@Model.QuestionsNeedingReview pending)
+                                </a>
+                            }
+                        </div>
                     </div>
+                    
+                    @* Review Summary *@
+                    @if (Model.IsCurrentUserReviewer && Model.HasReviewAssignments)
+                    {
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1"><i class="bi bi-clipboard-check"></i> Review Status</h6>
+                                    <small class="text-muted">
+                                        @Model.CompletedReviewsCount completed, @Model.PendingReviewsCount pending reviews
+                                    </small>
+                                </div>
+                                <a asp-controller="Review" asp-action="MyReviews" class="btn btn-outline-info btn-sm">
+                                    <i class="bi bi-list-check"></i> My Reviews
+                                </a>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -131,6 +158,14 @@
                                 {
                                     <span class="badge bg-secondary">Pending</span>
                                 }
+                                
+                                @* Review Status Badge *@
+                                @if (question.IsAssignedForReview && question.HasResponse)
+                                {
+                                    <span class="badge @question.ReviewStatusBadgeClass ms-1">
+                                        <i class="bi bi-clipboard-check"></i> @question.ReviewStatusDisplay
+                                    </span>
+                                }
                             </div>
                         </div>
                     </div>
@@ -157,6 +192,30 @@
                         }
                         else
                         {
+                            <!-- Pre-populated Answer Indicator -->
+                            <div class="pre-populated-indicator alert alert-warning d-none" data-question-id="@question.QuestionId">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-arrow-repeat"></i> 
+                                        <strong>Pre-populated Answer</strong>
+                                        <br>
+                                        <small class="text-muted">This answer was copied from a previous reporting period. Please review and accept or reject it.</small>
+                                    </div>
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-success btn-sm accept-prepopulated-btn" 
+                                                data-question-id="@question.QuestionId" 
+                                                data-response-id="">
+                                            <i class="bi bi-check"></i> Accept
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm reject-prepopulated-btn" 
+                                                data-question-id="@question.QuestionId" 
+                                                data-response-id="">
+                                            <i class="bi bi-x"></i> Reject
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Editable Question -->
                             <form class="question-form" data-question-id="@question.QuestionId" data-assignment-id="@Model.AssignmentId">
                                 @await Html.PartialAsync("_QuestionInput", question)
@@ -168,6 +227,14 @@
                                             <a asp-action="DelegateQuestion" asp-route-assignmentId="@Model.AssignmentId" asp-route-questionId="@question.QuestionId" 
                                                class="btn btn-outline-secondary btn-sm">
                                                 <i class="bi bi-share"></i> Delegate
+                                            </a>
+                                        }
+                                        @if (question.IsCurrentUserReviewer && question.HasResponse)
+                                        {
+                                            <a asp-controller="Review" asp-action="ReviewQuestions" asp-route-id="@question.ReviewAssignmentId" 
+                                               class="btn btn-outline-info btn-sm ms-2">
+                                                <i class="bi bi-clipboard-check"></i> 
+                                                @(question.ReviewStatus == ReviewStatus.Pending ? "Start Review" : "Continue Review")
                                             </a>
                                         }
                                     </div>
@@ -189,6 +256,51 @@
         
         <!-- Sidebar -->
         <div class="col-lg-3">
+            <!-- Pre-population Panel -->
+            <div class="card mb-3 position-sticky" style="top: 20px;">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="bi bi-arrow-repeat"></i> Pre-populate Answers</h6>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="togglePrePopulation">
+                            <i class="bi bi-chevron-up"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" id="prePopulationPanel">
+                    <p class="text-muted small mb-3">Copy answers from previous reporting periods to save time.</p>
+                    
+                    <div class="mb-3">
+                        <label for="previousCampaignSelect" class="form-label small fw-semibold">Previous Campaign:</label>
+                        <select class="form-select form-select-sm" id="previousCampaignSelect" disabled>
+                            <option value="">Loading previous campaigns...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="previewMatchingBtn" disabled>
+                            <i class="bi bi-eye"></i> Preview Matching
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" id="prePopulateBtn" disabled>
+                            <i class="bi bi-arrow-repeat"></i> Pre-populate Answers
+                        </button>
+                    </div>
+                    
+                    <div id="prePopulationSummary" class="mt-3" style="display: none;">
+                        <div class="alert alert-info small">
+                            <div id="summaryText"></div>
+                            <div class="mt-2" id="bulkActions" style="display: none;">
+                                <button type="button" class="btn btn-success btn-sm" id="acceptAllBtn">
+                                    <i class="bi bi-check-all"></i> Accept All
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm ms-1" id="rejectAllBtn">
+                                    <i class="bi bi-x-circle"></i> Reject All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filtering Panel -->
             <div class="card mb-3 position-sticky" style="top: 20px;">
                 <div class="card-header">
@@ -996,6 +1108,245 @@
         $(document).ready(function() {
             updateFilterSummary(originalQuestionCount);
         });
+
+        // Pre-population Logic
+        var currentAssignmentId = @Model.AssignmentId;
+        
+        // Toggle pre-population panel
+        $('#togglePrePopulation').click(function() {
+            var panel = $('#prePopulationPanel');
+            var icon = $(this).find('i');
+            
+            if (panel.is(':visible')) {
+                panel.slideUp();
+                icon.removeClass('bi-chevron-up').addClass('bi-chevron-down');
+            } else {
+                panel.slideDown();
+                icon.removeClass('bi-chevron-down').addClass('bi-chevron-up');
+            }
+        });
+        
+        // Load previous campaigns on page load
+        loadPreviousCampaigns();
+        
+        function loadPreviousCampaigns() {
+            $.get('/AnswerPrePopulation/GetPreviousCampaigns', { campaignAssignmentId: currentAssignmentId })
+                .done(function(response) {
+                    var select = $('#previousCampaignSelect');
+                    select.empty();
+                    
+                    if (response.success && response.data && response.data.length > 0) {
+                        select.append('<option value="">Select a previous campaign...</option>');
+                        response.data.forEach(function(campaign) {
+                            var periodText = '';
+                            if (campaign.reportingPeriodStart && campaign.reportingPeriodEnd) {
+                                var startDate = new Date(campaign.reportingPeriodStart).toLocaleDateString();
+                                var endDate = new Date(campaign.reportingPeriodEnd).toLocaleDateString();
+                                periodText = ` (${startDate} - ${endDate})`;
+                            }
+                            select.append(`<option value="${campaign.campaignAssignmentId}">${campaign.campaignName}${periodText} - ${campaign.responseCount} responses</option>`);
+                        });
+                        select.prop('disabled', false);
+                    } else {
+                        select.append('<option value="">No previous campaigns found</option>');
+                    }
+                })
+                .fail(function() {
+                    $('#previousCampaignSelect').html('<option value="">Error loading campaigns</option>');
+                });
+        }
+        
+        // Enable/disable buttons based on selection
+        $('#previousCampaignSelect').change(function() {
+            var hasSelection = $(this).val() !== '';
+            $('#previewMatchingBtn, #prePopulateBtn').prop('disabled', !hasSelection);
+        });
+        
+        // Preview matching functionality
+        $('#previewMatchingBtn').click(function() {
+            var previousAssignmentId = $('#previousCampaignSelect').val();
+            if (!previousAssignmentId) return;
+            
+            var btn = $(this);
+            btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Loading...');
+            
+            $.get('/AnswerPrePopulation/PreviewMatching', { 
+                currentAssignmentId: currentAssignmentId, 
+                previousAssignmentId: previousAssignmentId 
+            })
+            .done(function(response) {
+                if (response.success) {
+                    showMatchingPreview(response.data);
+                } else {
+                    showAlert('Error', response.message || 'Failed to preview matching.', 'danger');
+                }
+            })
+            .fail(function() {
+                showAlert('Error', 'Failed to preview question matching.', 'danger');
+            })
+            .always(function() {
+                btn.prop('disabled', false).html('<i class="bi bi-eye"></i> Preview Matching');
+            });
+        });
+        
+        // Pre-populate answers functionality
+        $('#prePopulateBtn').click(function() {
+            var previousAssignmentId = $('#previousCampaignSelect').val();
+            if (!previousAssignmentId) return;
+            
+            if (!confirm('This will copy answers from the selected previous campaign. Continue?')) {
+                return;
+            }
+            
+            var btn = $(this);
+            btn.prop('disabled', true).html('<i class="bi bi-hourglass-split"></i> Processing...');
+            
+            $.post('/AnswerPrePopulation/PrePopulateAnswers', { 
+                currentAssignmentId: currentAssignmentId, 
+                previousAssignmentId: previousAssignmentId 
+            })
+            .done(function(response) {
+                if (response.success) {
+                    showAlert('Success', response.message, 'success');
+                    updatePrePopulationSummary(response.data);
+                    setTimeout(function() { location.reload(); }, 2000);
+                } else {
+                    showAlert('Error', response.message || 'Failed to pre-populate answers.', 'danger');
+                }
+            })
+            .fail(function() {
+                showAlert('Error', 'Failed to pre-populate answers.', 'danger');
+            })
+            .always(function() {
+                btn.prop('disabled', false).html('<i class="bi bi-arrow-repeat"></i> Pre-populate Answers');
+            });
+        });
+        
+        // Helper functions
+        function showMatchingPreview(data) {
+            var modal = `
+                <div class="modal fade" id="matchingPreviewModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Question Matching Preview</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row mb-3">
+                                    <div class="col-sm-4">
+                                        <div class="text-center">
+                                            <div class="h4 text-primary">${data.matches.length}</div>
+                                            <div class="text-muted">Matches Found</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <div class="text-center">
+                                            <div class="h4 text-warning">${data.unmatchedQuestions.length}</div>
+                                            <div class="text-muted">Unmatched</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <div class="text-center">
+                                            <div class="h4 text-info">${data.totalCurrentQuestions}</div>
+                                            <div class="text-muted">Total Questions</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <h6>Matched Questions:</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Current Question</th>
+                                                <th>Previous Question</th>
+                                                <th>Match Type</th>
+                                                <th>Previous Answer</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+            
+            data.matches.forEach(function(match) {
+                var matchTypeBadge = match.matchType === 'Exact' ? 'success' : 
+                                   match.matchType === 'High' ? 'primary' : 'warning';
+                var answerPreview = match.previousResponseValue ? 
+                    (match.previousResponseValue.length > 50 ? 
+                     match.previousResponseValue.substring(0, 50) + '...' : 
+                     match.previousResponseValue) : 
+                    '<em>No answer</em>';
+                
+                modal += `
+                    <tr>
+                        <td class="text-truncate" style="max-width: 200px;" title="${match.currentQuestionText}">
+                            ${match.currentQuestionText.length > 40 ? match.currentQuestionText.substring(0, 40) + '...' : match.currentQuestionText}
+                        </td>
+                        <td class="text-truncate" style="max-width: 200px;" title="${match.previousQuestionText}">
+                            ${match.previousQuestionText.length > 40 ? match.previousQuestionText.substring(0, 40) + '...' : match.previousQuestionText}
+                        </td>
+                        <td><span class="badge bg-${matchTypeBadge}">${match.matchType}</span></td>
+                        <td class="text-truncate" style="max-width: 150px;" title="${match.previousResponseValue || ''}">
+                            ${answerPreview}
+                        </td>
+                    </tr>`;
+            });
+            
+            modal += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>`;
+            
+            // Remove existing modal if present
+            $('#matchingPreviewModal').remove();
+            
+            // Add and show new modal
+            $('body').append(modal);
+            $('#matchingPreviewModal').modal('show');
+        }
+        
+        function updatePrePopulationSummary(data) {
+            if (data.prePopulatedCount > 0) {
+                $('#summaryText').text(`${data.prePopulatedCount} answers pre-populated, ${data.unmatchedCount} unmatched, ${data.skippedCount} skipped.`);
+                $('#prePopulationSummary').show();
+                $('#bulkActions').show();
+            }
+        }
+        
+        function showAlert(title, message, type) {
+            // Create and show a toast notification
+            var toast = `
+                <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <strong>${title}:</strong> ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>`;
+            
+            // Add toast container if it doesn't exist
+            if ($('#toastContainer').length === 0) {
+                $('body').append('<div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3"></div>');
+            }
+            
+            var $toast = $(toast);
+            $('#toastContainer').append($toast);
+            
+            var toastInstance = new bootstrap.Toast($toast[0]);
+            toastInstance.show();
+            
+            // Remove toast element after it's hidden
+            $toast.on('hidden.bs.toast', function() {
+                $(this).remove();
+            });
+        }
 
         // Conditional Questions Logic
         function checkConditionalQuestions() {

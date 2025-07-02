@@ -17,13 +17,34 @@ public class CampaignController : BaseController
         _context = context;
     }
 
+    // GET: Campaign/Dashboard
+    public async Task<IActionResult> Dashboard()
+    {
+        var dashboardViewModel = await BuildCampaignDashboardAsync();
+        return View(dashboardViewModel);
+    }
+
     // GET: Campaign
     public async Task<IActionResult> Index()
     {
-        IQueryable<Campaign> campaignQuery = _context.Campaigns
-            .Include(c => c.Organization)
-            .Include(c => c.CreatedBy)
-            .Include(c => c.Assignments);
+        IQueryable<Campaign> campaignQuery;
+        
+        // For Platform Admins, bypass global query filters to see all campaigns
+        if (IsPlatformAdmin)
+        {
+            campaignQuery = _context.Campaigns
+                .IgnoreQueryFilters()
+                .Include(c => c.Organization)
+                .Include(c => c.CreatedBy)
+                .Include(c => c.Assignments);
+        }
+        else
+        {
+            campaignQuery = _context.Campaigns
+                .Include(c => c.Organization)
+                .Include(c => c.CreatedBy)
+                .Include(c => c.Assignments);
+        }
 
         // Apply user rights filtering
         if (!IsPlatformAdmin)
@@ -75,7 +96,15 @@ public class CampaignController : BaseController
         else
         {
             // For platform admins and platform organizations, load all assignments
-            var campaignQuery = _context.Campaigns
+            IQueryable<Campaign> campaignQuery = _context.Campaigns;
+            
+            // Bypass global query filters for platform admins
+            if (IsPlatformAdmin)
+            {
+                campaignQuery = campaignQuery.IgnoreQueryFilters();
+            }
+            
+            campaignQuery = campaignQuery
                 .Include(c => c.Organization)
                 .Include(c => c.CreatedBy)
                 .Include(c => c.Assignments)
@@ -100,6 +129,9 @@ public class CampaignController : BaseController
 
         // Set campaign-specific branding context
         await SetBrandingContextAsync(campaignId: id.Value);
+
+        // Pass additional data to view
+        ViewBag.CanCloseCampaign = CanCloseCampaign(campaign);
 
         return View(campaign);
     }
@@ -249,6 +281,7 @@ public class CampaignController : BaseController
 
                 campaign.Name = model.Name;
                 campaign.Description = model.Description;
+                campaign.Status = model.Status;
                 campaign.StartDate = model.StartDate;
                 campaign.EndDate = model.EndDate;
                 campaign.Deadline = model.Deadline;
@@ -296,9 +329,131 @@ public class CampaignController : BaseController
         var campaign = await GetCampaignWithAccessCheckAsync(id);
         if (campaign != null)
         {
-            _context.Campaigns.Remove(campaign);
-            await _context.SaveChangesAsync();
-            TempData["Success"] = "Campaign deleted successfully!";
+            try
+            {
+                // Get all campaign assignment IDs for this campaign (ignore global filters)
+                var assignmentIds = await _context.CampaignAssignments
+                    .IgnoreQueryFilters()
+                    .Where(ca => ca.CampaignId == id)
+                    .Select(ca => ca.Id)
+                    .ToListAsync();
+
+                if (assignmentIds.Any())
+                {
+                    // Delete all related data in the correct order to avoid foreign key constraints
+                    
+                    // 1. Delete responses and related data
+                    var responseIds = await _context.Responses
+                        .IgnoreQueryFilters()
+                        .Where(r => assignmentIds.Contains(r.CampaignAssignmentId))
+                        .Select(r => r.Id)
+                        .ToListAsync();
+
+                    if (responseIds.Any())
+                    {
+                        // Delete file uploads
+                        var fileUploads = await _context.FileUploads
+                            .IgnoreQueryFilters()
+                            .Where(f => responseIds.Contains(f.ResponseId))
+                            .ToListAsync();
+                        _context.FileUploads.RemoveRange(fileUploads);
+
+                        // Delete response changes
+                        var responseChanges = await _context.ResponseChanges
+                            .IgnoreQueryFilters()
+                            .Where(rc => responseIds.Contains(rc.ResponseId))
+                            .ToListAsync();
+                        _context.ResponseChanges.RemoveRange(responseChanges);
+
+                        // Delete response overrides
+                        var responseOverrides = await _context.ResponseOverrides
+                            .IgnoreQueryFilters()
+                            .Where(ro => responseIds.Contains(ro.ResponseId))
+                            .ToListAsync();
+                        _context.ResponseOverrides.RemoveRange(responseOverrides);
+
+                        // Delete review comments
+                        var reviewComments = await _context.ReviewComments
+                            .IgnoreQueryFilters()
+                            .Where(rc => responseIds.Contains(rc.ResponseId))
+                            .ToListAsync();
+                        _context.ReviewComments.RemoveRange(reviewComments);
+
+                        // Delete response workflows
+                        var responseWorkflows = await _context.ResponseWorkflows
+                            .IgnoreQueryFilters()
+                            .Where(rw => responseIds.Contains(rw.ResponseId))
+                            .ToListAsync();
+                        _context.ResponseWorkflows.RemoveRange(responseWorkflows);
+
+                        // Clear SourceResponseId references to prevent foreign key conflicts
+                        // This handles cases where responses reference other responses within the same campaign
+                        await _context.Responses
+                            .IgnoreQueryFilters()
+                            .Where(r => responseIds.Contains(r.SourceResponseId ?? 0))
+                            .ExecuteUpdateAsync(r => r.SetProperty(x => x.SourceResponseId, (int?)null));
+
+                        // Delete responses
+                        var responses = await _context.Responses
+                            .IgnoreQueryFilters()
+                            .Where(r => responseIds.Contains(r.Id))
+                            .ToListAsync();
+                        _context.Responses.RemoveRange(responses);
+                    }
+
+                    // 2. Delete delegations
+                    var delegations = await _context.Delegations
+                        .IgnoreQueryFilters()
+                        .Where(d => assignmentIds.Contains(d.CampaignAssignmentId))
+                        .ToListAsync();
+                    _context.Delegations.RemoveRange(delegations);
+
+                    // 3. Delete question assignments
+                    var questionAssignments = await _context.QuestionAssignments
+                        .IgnoreQueryFilters()
+                        .Where(qa => assignmentIds.Contains(qa.CampaignAssignmentId))
+                        .ToListAsync();
+                    _context.QuestionAssignments.RemoveRange(questionAssignments);
+
+                    // 4. Delete question assignment changes
+                    var questionAssignmentChanges = await _context.QuestionAssignmentChanges
+                        .IgnoreQueryFilters()
+                        .Where(qac => assignmentIds.Contains(qac.CampaignAssignmentId))
+                        .ToListAsync();
+                    _context.QuestionAssignmentChanges.RemoveRange(questionAssignmentChanges);
+
+                    // 5. Delete review assignments and audit logs (these have cascade delete from campaign assignments)
+                    var reviewAssignments = await _context.ReviewAssignments
+                        .IgnoreQueryFilters()
+                        .Where(ra => assignmentIds.Contains(ra.CampaignAssignmentId))
+                        .ToListAsync();
+                    _context.ReviewAssignments.RemoveRange(reviewAssignments);
+
+                    var reviewAuditLogs = await _context.ReviewAuditLogs
+                        .IgnoreQueryFilters()
+                        .Where(ral => assignmentIds.Contains(ral.CampaignAssignmentId))
+                        .ToListAsync();
+                    _context.ReviewAuditLogs.RemoveRange(reviewAuditLogs);
+
+                    // 6. Delete campaign assignments
+                    var campaignAssignments = await _context.CampaignAssignments
+                        .IgnoreQueryFilters()
+                        .Where(ca => assignmentIds.Contains(ca.Id))
+                        .ToListAsync();
+                    _context.CampaignAssignments.RemoveRange(campaignAssignments);
+                }
+
+                // 7. Finally delete the campaign
+                _context.Campaigns.Remove(campaign);
+                await _context.SaveChangesAsync();
+
+                TempData["Success"] = "Campaign and all related data deleted successfully!";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Error deleting campaign: {ex.Message}";
+                return RedirectToAction(nameof(Details), new { id });
+            }
         }
 
         return RedirectToAction(nameof(Index));
@@ -1028,4 +1183,641 @@ public class CampaignController : BaseController
     {
         return _context.CampaignAssignments.Any(e => e.Id == id);
     }
+
+    // POST: Campaign/CloseCampaign/5
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = "OrgAdminOrHigher")]
+    public async Task<IActionResult> CloseCampaign(int id)
+    {
+        var campaign = await GetCampaignWithAccessCheckAsync(id);
+        if (campaign == null) return NotFound();
+
+        // Check if all assignments are submitted or approved
+        var allSubmitted = campaign.Assignments.All(a => 
+            a.Status == AssignmentStatus.Submitted || 
+            a.Status == AssignmentStatus.Approved);
+
+        if (!allSubmitted)
+        {
+            TempData["Error"] = "Cannot close campaign - not all assignments have been submitted.";
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
+        // Close the campaign
+        campaign.Status = CampaignStatus.Completed;
+        campaign.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        TempData["Success"] = "Campaign closed successfully!";
+        return RedirectToAction(nameof(Dashboard));
+    }
+
+    // Helper method to check if campaign can be closed
+    private bool CanCloseCampaign(Campaign campaign)
+    {
+        return campaign.Status == CampaignStatus.Active && 
+               campaign.Assignments.Any() && 
+               campaign.Assignments.All(a => 
+                   a.Status == AssignmentStatus.Submitted || 
+                   a.Status == AssignmentStatus.Approved);
+    }
+
+    #region Campaign Dashboard Methods (Phase 5.1)
+
+    private async Task<CampaignDashboardViewModel> BuildCampaignDashboardAsync()
+    {
+        IQueryable<Campaign> campaignQuery;
+        IQueryable<CampaignAssignment> assignmentQuery;
+
+        // Apply access control filters based on user role
+        if (IsPlatformAdmin)
+        {
+            campaignQuery = _context.Campaigns.IgnoreQueryFilters();
+            assignmentQuery = _context.CampaignAssignments.IgnoreQueryFilters();
+        }
+        else
+        {
+            campaignQuery = _context.Campaigns;
+            assignmentQuery = _context.CampaignAssignments;
+
+            if (IsCurrentOrgSupplierType)
+            {
+                // Supplier organizations can only see campaigns where they have assignments
+                campaignQuery = campaignQuery.Where(c => 
+                    c.Assignments.Any(a => a.TargetOrganizationId == CurrentOrganizationId));
+                assignmentQuery = assignmentQuery.Where(a => a.TargetOrganizationId == CurrentOrganizationId);
+            }
+            else if (IsCurrentOrgPlatformType)
+            {
+                // Platform organizations can see their own campaigns
+                campaignQuery = campaignQuery.Where(c => c.OrganizationId == CurrentOrganizationId);
+                assignmentQuery = assignmentQuery.Where(a => a.Campaign.OrganizationId == CurrentOrganizationId);
+            }
+        }
+
+        // Load campaigns with necessary includes
+        var allCampaigns = await campaignQuery
+            .Include(c => c.Organization)
+            .Include(c => c.CreatedBy)
+            .Include(c => c.Assignments)
+                .ThenInclude(a => a.TargetOrganization)
+            .Include(c => c.Assignments)
+                .ThenInclude(a => a.Responses)
+            .Include(c => c.Assignments)
+                .ThenInclude(a => a.QuestionnaireVersion)
+                    .ThenInclude(qv => qv.Questionnaire)
+                        .ThenInclude(q => q.Questions)
+            .ToListAsync();
+
+        // Load all assignments with response data for detailed metrics
+        var allAssignments = await assignmentQuery
+            .Include(a => a.Campaign)
+                .ThenInclude(c => c.Organization)
+            .Include(a => a.TargetOrganization)
+            .Include(a => a.Responses)
+            .Include(a => a.QuestionnaireVersion)
+                .ThenInclude(qv => qv.Questionnaire)
+                    .ThenInclude(q => q.Questions)
+            .ToListAsync();
+
+        // Build dashboard summary
+        var summary = BuildDashboardSummary(allCampaigns, allAssignments);
+
+        // Get open campaigns (Draft, Active, Paused - excluding Completed and Cancelled)
+        var activeCampaigns = allCampaigns
+            .Where(c => c.Status == CampaignStatus.Draft || c.Status == CampaignStatus.Active || c.Status == CampaignStatus.Paused)
+            .Select(c => BuildCampaignDashboardItem(c, allAssignments.Where(a => a.CampaignId == c.Id).ToList()))
+            .OrderBy(c => c.Status == CampaignStatus.Draft ? 0 : c.Status == CampaignStatus.Active ? 1 : 2) // Draft first, then Active, then Paused
+            .ThenBy(c => c.Deadline ?? DateTime.MaxValue)
+            .ToList();
+
+        // Get recent campaigns (completed or active, ordered by creation date)
+        var recentCampaigns = allCampaigns
+            .Where(c => c.Status != CampaignStatus.Draft)
+            .OrderByDescending(c => c.CreatedAt)
+            .Take(5)
+            .Select(c => BuildCampaignDashboardItem(c, allAssignments.Where(a => a.CampaignId == c.Id).ToList()))
+            .ToList();
+
+        // Build progress metrics
+        var progressMetrics = await BuildProgressMetricsAsync(allAssignments);
+
+        // Build campaign performance data
+        var campaignPerformance = allCampaigns
+            .Where(c => c.Status == CampaignStatus.Active)
+            .Select(c => BuildCampaignPerformance(c, allAssignments.Where(a => a.CampaignId == c.Id).ToList()))
+            .OrderByDescending(c => c.CompletionRate)
+            .ToList();
+
+        // Build assignment-focused sections
+        var companyBreakdown = await BuildCompanyBreakdownAsync(allAssignments);
+        var responderBreakdown = await BuildResponderBreakdownAsync(allAssignments);
+        var statusDistribution = BuildStatusDistribution(allAssignments);
+
+        return new CampaignDashboardViewModel
+        {
+            Summary = summary,
+            ActiveCampaigns = activeCampaigns,
+            RecentCampaigns = recentCampaigns,
+            ProgressMetrics = progressMetrics,
+            CampaignPerformance = campaignPerformance,
+            CompanyBreakdown = companyBreakdown,
+            ResponderBreakdown = responderBreakdown,
+            StatusDistribution = statusDistribution
+        };
+    }
+
+    private CampaignDashboardSummaryViewModel BuildDashboardSummary(List<Campaign> campaigns, List<CampaignAssignment> assignments)
+    {
+        var now = DateTime.Now;
+
+        return new CampaignDashboardSummaryViewModel
+        {
+            TotalActiveCampaigns = campaigns.Count(c => c.Status == CampaignStatus.Active),
+            TotalCompletedCampaigns = campaigns.Count(c => c.Status == CampaignStatus.Completed),
+            TotalDraftCampaigns = campaigns.Count(c => c.Status == CampaignStatus.Draft),
+            TotalPausedCampaigns = campaigns.Count(c => c.Status == CampaignStatus.Paused),
+            TotalAssignments = assignments.Count,
+            TotalActiveAssignments = assignments.Count(a => a.Status == AssignmentStatus.InProgress || a.Status == AssignmentStatus.NotStarted),
+            TotalCompletedAssignments = assignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved),
+            TotalOverdueAssignments = assignments.Count(a => 
+                a.Campaign.Deadline.HasValue && 
+                a.Campaign.Deadline.Value < now && 
+                a.Status != AssignmentStatus.Approved)
+        };
+    }
+
+    private CampaignDashboardItemViewModel BuildCampaignDashboardItem(Campaign campaign, List<CampaignAssignment> assignments)
+    {
+        var now = DateTime.Now;
+
+        // Calculate response time analytics
+        var completedAssignments = assignments.Where(a => a.Status == AssignmentStatus.Approved).ToList();
+        var responseTimeHours = CalculateAverageResponseTime(assignments);
+
+        var item = new CampaignDashboardItemViewModel
+        {
+            Id = campaign.Id,
+            Name = campaign.Name,
+            Description = campaign.Description ?? string.Empty,
+            Status = campaign.Status,
+            StartDate = campaign.StartDate,
+            EndDate = campaign.EndDate,
+            Deadline = campaign.Deadline,
+            CreatedAt = campaign.CreatedAt,
+            OrganizationName = campaign.Organization?.Name ?? "Unknown",
+            CreatedByName = campaign.CreatedBy != null ? $"{campaign.CreatedBy.FirstName} {campaign.CreatedBy.LastName}" : "Unknown",
+            TotalAssignments = assignments.Count,
+            CompletedAssignments = assignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved),
+            InProgressAssignments = assignments.Count(a => a.Status == AssignmentStatus.InProgress),
+            NotStartedAssignments = assignments.Count(a => a.Status == AssignmentStatus.NotStarted),
+            OverdueAssignments = assignments.Count(a => 
+                campaign.Deadline.HasValue && 
+                campaign.Deadline.Value < now && 
+                a.Status != AssignmentStatus.Submitted && a.Status != AssignmentStatus.Approved),
+            AverageResponseTimeHours = responseTimeHours,
+            FirstResponseAt = GetFirstResponseDate(assignments),
+            LastResponseAt = GetLastResponseDate(assignments)
+        };
+
+        return item;
+    }
+
+    private async Task<CampaignProgressMetricsViewModel> BuildProgressMetricsAsync(List<CampaignAssignment> assignments)
+    {
+        var totalQuestions = assignments.Sum(a => a.QuestionnaireVersion?.Questionnaire?.Questions?.Count ?? 0);
+        var answeredQuestions = assignments.Sum(a => a.Responses?.Count ?? 0);
+        var activeAssignments = assignments.Where(a => a.Status == AssignmentStatus.InProgress).ToList();
+
+        // Calculate daily progress for the last 30 days
+        var dailyProgress = await BuildDailyProgressAsync(assignments);
+        
+        // Calculate weekly progress for the last 12 weeks
+        var weeklyProgress = BuildWeeklyProgress(assignments);
+
+        return new CampaignProgressMetricsViewModel
+        {
+            OverallCompletionRate = assignments.Count > 0 ? 
+                (decimal)assignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved) / assignments.Count * 100 : 0,
+            OverallResponseRate = totalQuestions > 0 ? (decimal)answeredQuestions / totalQuestions * 100 : 0,
+            AverageResponseTimeHours = CalculateAverageResponseTime(assignments) ?? 0,
+            TotalQuestionsAnswered = answeredQuestions,
+            TotalQuestionsAssigned = totalQuestions,
+            ActiveRespondents = activeAssignments.Select(a => a.LeadResponderId).Distinct().Count(),
+            TotalRespondents = assignments.Select(a => a.LeadResponderId).Where(id => !string.IsNullOrEmpty(id)).Distinct().Count(),
+            DailyProgress = dailyProgress,
+            WeeklyProgress = weeklyProgress
+        };
+    }
+
+    private CampaignPerformanceViewModel BuildCampaignPerformance(Campaign campaign, List<CampaignAssignment> assignments)
+    {
+        var completionRate = assignments.Count > 0 ? 
+            (decimal)assignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved) / assignments.Count * 100 : 0;
+        var averageResponseTime = CalculateAverageResponseTime(assignments) ?? 0;
+        var overdueAssignments = assignments.Count(a => 
+            campaign.Deadline.HasValue && 
+            campaign.Deadline.Value < DateTime.Now && 
+            a.Status != AssignmentStatus.Submitted && a.Status != AssignmentStatus.Approved);
+
+        // Determine performance indicator
+        var (indicator, color) = GetPerformanceIndicator(completionRate, overdueAssignments, assignments.Count, campaign.Deadline);
+
+        return new CampaignPerformanceViewModel
+        {
+            CampaignId = campaign.Id,
+            CampaignName = campaign.Name,
+            CompletionRate = completionRate,
+            AverageResponseTimeHours = averageResponseTime,
+            TotalAssignments = assignments.Count,
+            CompletedAssignments = assignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved),
+            OverdueAssignments = overdueAssignments,
+            Deadline = campaign.Deadline,
+            IsOnTrack = overdueAssignments == 0 && completionRate >= 50,
+            PerformanceIndicator = indicator,
+            PerformanceColor = color
+        };
+    }
+
+    private double? CalculateAverageResponseTime(List<CampaignAssignment> assignments)
+    {
+        var completedAssignments = assignments.Where(a => a.StartedAt.HasValue && a.SubmittedAt.HasValue).ToList();
+        
+        if (!completedAssignments.Any())
+            return null;
+
+        var totalHours = completedAssignments.Sum(a => (a.SubmittedAt!.Value - a.StartedAt!.Value).TotalHours);
+        return totalHours / completedAssignments.Count;
+    }
+
+    private DateTime? GetFirstResponseDate(List<CampaignAssignment> assignments)
+    {
+        return assignments
+            .SelectMany(a => a.Responses ?? new List<Response>())
+            .Where(r => r.CreatedAt != default)
+            .OrderBy(r => r.CreatedAt)
+            .FirstOrDefault()?.CreatedAt;
+    }
+
+    private DateTime? GetLastResponseDate(List<CampaignAssignment> assignments)
+    {
+        return assignments
+            .SelectMany(a => a.Responses ?? new List<Response>())
+            .Where(r => r.UpdatedAt.HasValue)
+            .OrderByDescending(r => r.UpdatedAt)
+            .FirstOrDefault()?.UpdatedAt ?? 
+            assignments
+            .SelectMany(a => a.Responses ?? new List<Response>())
+            .Where(r => r.CreatedAt != default)
+            .OrderByDescending(r => r.CreatedAt)
+            .FirstOrDefault()?.CreatedAt;
+    }
+
+    private async Task<List<DailyProgressViewModel>> BuildDailyProgressAsync(List<CampaignAssignment> assignments)
+    {
+        var last30Days = Enumerable.Range(0, 30)
+            .Select(i => DateTime.Now.Date.AddDays(-i))
+            .OrderBy(d => d)
+            .ToList();
+
+        var dailyProgress = new List<DailyProgressViewModel>();
+
+        foreach (var date in last30Days)
+        {
+            var nextDay = date.AddDays(1);
+            
+            var responsesOnDate = assignments
+                .SelectMany(a => a.Responses ?? new List<Response>())
+                .Count(r => r.CreatedAt.Date == date);
+
+            var completedOnDate = assignments
+                .Count(a => a.SubmittedAt.HasValue && a.SubmittedAt.Value.Date == date);
+
+            var newAssignmentsOnDate = assignments
+                .Count(a => a.CreatedAt.Date == date);
+
+            dailyProgress.Add(new DailyProgressViewModel
+            {
+                Date = date,
+                ResponsesReceived = responsesOnDate,
+                AssignmentsCompleted = completedOnDate,
+                NewAssignments = newAssignmentsOnDate
+            });
+        }
+
+        return dailyProgress;
+    }
+
+    private List<WeeklyProgressViewModel> BuildWeeklyProgress(List<CampaignAssignment> assignments)
+    {
+        var last12Weeks = Enumerable.Range(0, 12)
+            .Select(i => DateTime.Now.Date.AddDays(-(int)DateTime.Now.DayOfWeek + (int)DayOfWeek.Monday - (i * 7)))
+            .OrderBy(d => d)
+            .ToList();
+
+        var weeklyProgress = new List<WeeklyProgressViewModel>();
+
+        foreach (var weekStart in last12Weeks)
+        {
+            var weekEnd = weekStart.AddDays(7);
+            
+            var responsesInWeek = assignments
+                .SelectMany(a => a.Responses ?? new List<Response>())
+                .Count(r => r.CreatedAt.Date >= weekStart && r.CreatedAt.Date < weekEnd);
+
+            var completedInWeek = assignments
+                .Count(a => a.SubmittedAt.HasValue && 
+                           a.SubmittedAt.Value.Date >= weekStart && 
+                           a.SubmittedAt.Value.Date < weekEnd);
+
+            var newAssignmentsInWeek = assignments
+                .Count(a => a.CreatedAt.Date >= weekStart && a.CreatedAt.Date < weekEnd);
+
+            var totalAssignmentsInWeek = assignments.Count(a => a.CreatedAt.Date < weekEnd);
+            var completedByWeekEnd = assignments.Count(a => 
+                a.SubmittedAt.HasValue && a.SubmittedAt.Value.Date < weekEnd);
+
+            weeklyProgress.Add(new WeeklyProgressViewModel
+            {
+                WeekStartDate = weekStart,
+                ResponsesReceived = responsesInWeek,
+                AssignmentsCompleted = completedInWeek,  
+                NewAssignments = newAssignmentsInWeek,
+                CompletionRate = totalAssignmentsInWeek > 0 ? 
+                    (decimal)completedByWeekEnd / totalAssignmentsInWeek * 100 : 0
+            });
+        }
+
+        return weeklyProgress;
+    }
+
+    private (string indicator, string color) GetPerformanceIndicator(decimal completionRate, int overdueCount, int totalAssignments, DateTime? deadline)
+    {
+        if (overdueCount > 0)
+        {
+            var overduePercentage = totalAssignments > 0 ? (decimal)overdueCount / totalAssignments * 100 : 0;
+            if (overduePercentage > 25)
+                return ("Behind", "danger");
+            else
+                return ("At Risk", "warning");
+        }
+
+        if (completionRate >= 90)
+            return ("Excellent", "success");
+        else if (completionRate >= 70)
+            return ("Good", "info");
+        else if (completionRate >= 50)
+            return ("On Track", "primary");
+        else
+        {
+            // Check if we're near deadline
+            if (deadline.HasValue && deadline.Value.Subtract(DateTime.Now).TotalDays <= 7)
+                return ("At Risk", "warning");
+            else
+                return ("In Progress", "secondary");
+        }
+    }
+
+    // Enhanced assignment-focused helper methods for dashboard
+
+    private async Task<List<CompanyAssignmentStatusViewModel>> BuildCompanyBreakdownAsync(List<CampaignAssignment> assignments)
+    {
+        // Group assignments by organization
+        var companyGroups = assignments
+            .GroupBy(a => a.TargetOrganizationId)
+            .ToList();
+
+        var companyBreakdown = new List<CompanyAssignmentStatusViewModel>();
+
+        foreach (var group in companyGroups)
+        {
+            var companyAssignments = group.ToList();
+            var organization = companyAssignments.First().TargetOrganization;
+            if (organization == null) continue;
+
+            var now = DateTime.Now;
+            var completedAssignments = companyAssignments.Where(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved).ToList();
+            var overdueAssignments = companyAssignments.Where(a => 
+                a.Campaign.Deadline.HasValue && 
+                a.Campaign.Deadline.Value < now && 
+                a.Status != AssignmentStatus.Submitted && a.Status != AssignmentStatus.Approved).ToList();
+
+            // Get organization attributes from relationship
+            var attributes = new List<OrganizationAttributeViewModel>();
+            var relationship = await _context.OrganizationRelationships
+                .Include(or => or.Attributes)
+                .FirstOrDefaultAsync(or => or.SupplierOrganizationId == organization.Id && or.IsActive);
+
+            if (relationship?.Attributes != null)
+            {
+                attributes = relationship.Attributes
+                    .Where(a => a.IsActive)
+                    .Select(a => new OrganizationAttributeViewModel
+                    {
+                        AttributeType = a.AttributeType,
+                        Value = a.AttributeValue
+                    }).ToList();
+            }
+
+            // Calculate response time
+            var responseTimeHours = CalculateAverageResponseTime(companyAssignments);
+
+            // Get active responders
+            var activeResponders = companyAssignments
+                .Where(a => !string.IsNullOrEmpty(a.LeadResponderId))
+                .Select(a => a.LeadResponderId)
+                .Distinct()
+                .Count();
+
+            // Get total responders (including question assignments)
+            var totalResponders = await _context.QuestionAssignments
+                .Where(qa => companyAssignments.Select(ca => ca.Id).Contains(qa.CampaignAssignmentId))
+                .Select(qa => qa.AssignedUserId)
+                .Distinct()
+                .CountAsync();
+
+            // Build campaign assignment summaries
+            var campaignSummaries = companyAssignments.Select(a => new CampaignAssignmentSummaryViewModel
+            {
+                CampaignId = a.CampaignId,
+                CampaignName = a.Campaign.Name,
+                CampaignStatus = a.Campaign.Status,
+                AssignmentStatus = a.Status,
+                Deadline = a.Campaign.Deadline,
+                LastActivityDate = a.Responses?.OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt).FirstOrDefault()?.UpdatedAt ?? a.Responses?.OrderByDescending(r => r.CreatedAt).FirstOrDefault()?.CreatedAt,
+                LeadResponderName = a.LeadResponder != null ? $"{a.LeadResponder.FirstName} {a.LeadResponder.LastName}" : null,
+                QuestionsAnswered = a.Responses?.Count ?? 0,
+                TotalQuestions = a.QuestionnaireVersion?.Questionnaire?.Questions?.Count ?? 0
+            }).ToList();
+
+            var companyStatus = new CompanyAssignmentStatusViewModel
+            {
+                OrganizationId = organization.Id,
+                OrganizationName = organization.Name,
+                OrganizationType = organization.TypeDisplayName,
+                Attributes = attributes,
+                RelationshipType = relationship?.RelationshipType ?? "Unknown",
+                TotalAssignments = companyAssignments.Count,
+                CompletedAssignments = completedAssignments.Count,
+                InProgressAssignments = companyAssignments.Count(a => a.Status == AssignmentStatus.InProgress),
+                NotStartedAssignments = companyAssignments.Count(a => a.Status == AssignmentStatus.NotStarted),
+                OverdueAssignments = overdueAssignments.Count,
+                UnderReviewAssignments = companyAssignments.Count(a => a.Status == AssignmentStatus.UnderReview),
+                ActiveResponders = activeResponders,
+                TotalResponders = Math.Max(totalResponders, activeResponders),
+                LastResponseDate = GetLastResponseDate(companyAssignments),
+                AverageResponseTimeHours = responseTimeHours,
+                NextDeadline = companyAssignments
+                    .Where(a => a.Campaign.Deadline.HasValue)
+                    .OrderBy(a => a.Campaign.Deadline)
+                    .FirstOrDefault()?.Campaign.Deadline,
+                CampaignAssignments = campaignSummaries
+            };
+
+            companyBreakdown.Add(companyStatus);
+        }
+
+        return companyBreakdown
+            .OrderByDescending(c => c.IsAtRisk)
+            .ThenByDescending(c => c.OverdueAssignments)
+            .ThenBy(c => c.CompletionRate)
+            .ToList();
+    }
+
+    private async Task<List<ResponderWorkloadViewModel>> BuildResponderBreakdownAsync(List<CampaignAssignment> assignments)
+    {
+        var responderBreakdown = new List<ResponderWorkloadViewModel>();
+
+        // Get all lead responders
+        var leadResponders = assignments
+            .Where(a => !string.IsNullOrEmpty(a.LeadResponderId))
+            .GroupBy(a => a.LeadResponderId)
+            .ToList();
+
+        foreach (var group in leadResponders)
+        {
+            var responderAssignments = group.ToList();
+            var leadResponder = responderAssignments.First().LeadResponder;
+            if (leadResponder == null) continue;
+
+            var organization = responderAssignments.First().TargetOrganization;
+
+            // Get question assignments for this user
+            var questionAssignments = await _context.QuestionAssignments
+                .Include(qa => qa.CampaignAssignment)
+                    .ThenInclude(ca => ca.Campaign)
+                .Include(qa => qa.Question)
+                .Where(qa => qa.AssignedUserId == leadResponder.Id)
+                .ToListAsync();
+
+            // Get delegated assignments
+            var delegatedAssignments = await _context.Delegations
+                .Where(d => d.ToUserId == leadResponder.Id)
+                .CountAsync();
+
+            // Calculate metrics
+            var completedAssignments = responderAssignments.Where(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved).ToList();
+            var overdueAssignments = responderAssignments.Where(a => 
+                a.Campaign.Deadline.HasValue && 
+                a.Campaign.Deadline.Value < DateTime.Now && 
+                a.Status != AssignmentStatus.Submitted && a.Status != AssignmentStatus.Approved).ToList();
+
+            var responseTimeHours = CalculateAverageResponseTime(responderAssignments);
+            var lastActivityDate = GetLastResponseDate(responderAssignments);
+
+            // Build assignment details
+            var assignmentDetails = responderAssignments.Select(a => new ResponderAssignmentSummaryViewModel
+            {
+                AssignmentId = a.Id,
+                CampaignName = a.Campaign.Name,
+                OrganizationName = a.TargetOrganization?.Name ?? "Unknown",
+                Status = a.Status,
+                Deadline = a.Campaign.Deadline,
+                LastActivityDate = a.Responses?.OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt).FirstOrDefault()?.UpdatedAt ?? a.Responses?.OrderByDescending(r => r.CreatedAt).FirstOrDefault()?.CreatedAt,
+                QuestionsAnswered = a.Responses?.Count ?? 0,
+                TotalQuestions = a.QuestionnaireVersion?.Questionnaire?.Questions?.Count ?? 0,
+                IsLeadResponder = true,
+                IsDelegated = false
+            }).ToList();
+
+            // Add delegated assignments to details
+            var delegatedDetails = questionAssignments.Select(qa => new ResponderAssignmentSummaryViewModel
+            {
+                AssignmentId = qa.CampaignAssignmentId,
+                CampaignName = qa.CampaignAssignment.Campaign.Name,
+                OrganizationName = qa.CampaignAssignment.TargetOrganization?.Name ?? "Unknown",
+                Status = qa.CampaignAssignment.Status,
+                Deadline = qa.CampaignAssignment.Campaign.Deadline,
+                LastActivityDate = qa.CampaignAssignment.Responses?
+                    .Where(r => r.QuestionId == qa.QuestionId)
+                    .OrderByDescending(r => r.UpdatedAt ?? r.CreatedAt)
+                    .FirstOrDefault()?.UpdatedAt ??
+                    qa.CampaignAssignment.Responses?
+                    .Where(r => r.QuestionId == qa.QuestionId)
+                    .OrderByDescending(r => r.CreatedAt)
+                    .FirstOrDefault()?.CreatedAt,
+                QuestionsAnswered = qa.CampaignAssignment.Responses?.Count(r => r.QuestionId == qa.QuestionId) ?? 0,
+                TotalQuestions = 1, // Individual question assignment
+                IsLeadResponder = false,
+                IsDelegated = true
+            }).ToList();
+
+            assignmentDetails.AddRange(delegatedDetails);
+
+            var responderWorkload = new ResponderWorkloadViewModel
+            {
+                UserId = leadResponder.Id,
+                UserName = $"{leadResponder.FirstName} {leadResponder.LastName}",
+                UserEmail = leadResponder.Email,
+                OrganizationName = organization?.Name ?? "Unknown",
+                OrganizationId = organization?.Id ?? 0,
+                UserRole = "User", // TODO: Load user roles if needed
+                TotalAssignments = responderAssignments.Count,
+                CompletedAssignments = completedAssignments.Count,
+                InProgressAssignments = responderAssignments.Count(a => a.Status == AssignmentStatus.InProgress),
+                NotStartedAssignments = responderAssignments.Count(a => a.Status == AssignmentStatus.NotStarted),
+                OverdueAssignments = overdueAssignments.Count,
+                AssignmentsAsLeadResponder = responderAssignments.Count,
+                DelegatedAssignments = delegatedAssignments,
+                AverageResponseTimeHours = responseTimeHours,
+                LastActivityDate = lastActivityDate,
+                QuestionsAnswered = responderAssignments.Sum(a => a.Responses?.Count ?? 0),
+                TotalQuestionsAssigned = responderAssignments.Sum(a => a.QuestionnaireVersion?.Questionnaire?.Questions?.Count ?? 0) + questionAssignments.Count,
+                AssignmentDetails = assignmentDetails.OrderByDescending(a => a.LastActivityDate).ToList()
+            };
+
+            responderBreakdown.Add(responderWorkload);
+        }
+
+        return responderBreakdown
+            .OrderByDescending(r => r.IsOverloaded)
+            .ThenByDescending(r => r.OverdueAssignments)
+            .ThenBy(r => r.CompletionRate)
+            .ToList();
+    }
+
+    private AssignmentStatusDistributionViewModel BuildStatusDistribution(List<CampaignAssignment> assignments)
+    {
+        var now = DateTime.Now;
+        var overdueAssignments = assignments.Where(a => 
+            a.Campaign.Deadline.HasValue && 
+            a.Campaign.Deadline.Value < now && 
+            a.Status != AssignmentStatus.Submitted && a.Status != AssignmentStatus.Approved).ToList();
+
+        return new AssignmentStatusDistributionViewModel
+        {
+            TotalAssignments = assignments.Count,
+            NotStartedCount = assignments.Count(a => a.Status == AssignmentStatus.NotStarted),
+            InProgressCount = assignments.Count(a => a.Status == AssignmentStatus.InProgress),
+            SubmittedCount = assignments.Count(a => a.Status == AssignmentStatus.Submitted),
+            UnderReviewCount = assignments.Count(a => a.Status == AssignmentStatus.UnderReview),
+            ApprovedCount = assignments.Count(a => a.Status == AssignmentStatus.Approved),
+            ChangesRequestedCount = assignments.Count(a => a.Status == AssignmentStatus.ChangesRequested),
+            OverdueCount = overdueAssignments.Count
+        };
+    }
+
+    #endregion
 } 

@@ -4,6 +4,7 @@ using ESGPlatform.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ESGPlatform.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250701201520_AddAnswerPrePopulationFields")]
+    partial class AddAnswerPrePopulationFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1054,16 +1057,6 @@ namespace ESGPlatform.Migrations
                     b.Property<int?>("SourceResponseId")
                         .HasColumnType("int");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("StatusUpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("StatusUpdatedById")
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
                     b.Property<string>("TextValue")
                         .HasColumnType("nvarchar(max)");
 
@@ -1077,8 +1070,6 @@ namespace ESGPlatform.Migrations
                     b.HasIndex("ResponderId");
 
                     b.HasIndex("SourceResponseId");
-
-                    b.HasIndex("StatusUpdatedById");
 
                     b.HasIndex("QuestionId", "CampaignAssignmentId")
                         .HasDatabaseName("IX_Responses_Question_Assignment");
@@ -1169,44 +1160,6 @@ namespace ESGPlatform.Migrations
                         .HasDatabaseName("IX_ResponseOverrides_ResponseId");
 
                     b.ToTable("ResponseOverrides");
-                });
-
-            modelBuilder.Entity("ESGPlatform.Models.Entities.ResponseStatusHistory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ChangeReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ChangedById")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int>("FromStatus")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ResponseId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ToStatus")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChangedById");
-
-                    b.HasIndex("ResponseId");
-
-                    b.ToTable("ResponseStatusHistories");
                 });
 
             modelBuilder.Entity("ESGPlatform.Models.Entities.ResponseWorkflow", b =>
@@ -2139,10 +2092,6 @@ namespace ESGPlatform.Migrations
                         .WithMany()
                         .HasForeignKey("SourceResponseId");
 
-                    b.HasOne("ESGPlatform.Models.Entities.User", "StatusUpdatedBy")
-                        .WithMany()
-                        .HasForeignKey("StatusUpdatedById");
-
                     b.Navigation("CampaignAssignment");
 
                     b.Navigation("Question");
@@ -2150,8 +2099,6 @@ namespace ESGPlatform.Migrations
                     b.Navigation("Responder");
 
                     b.Navigation("SourceResponse");
-
-                    b.Navigation("StatusUpdatedBy");
                 });
 
             modelBuilder.Entity("ESGPlatform.Models.Entities.ResponseChange", b =>
@@ -2196,25 +2143,6 @@ namespace ESGPlatform.Migrations
                     b.Navigation("OriginalResponder");
 
                     b.Navigation("OverriddenBy");
-
-                    b.Navigation("Response");
-                });
-
-            modelBuilder.Entity("ESGPlatform.Models.Entities.ResponseStatusHistory", b =>
-                {
-                    b.HasOne("ESGPlatform.Models.Entities.User", "ChangedBy")
-                        .WithMany()
-                        .HasForeignKey("ChangedById")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ESGPlatform.Models.Entities.Response", "Response")
-                        .WithMany("StatusHistory")
-                        .HasForeignKey("ResponseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ChangedBy");
 
                     b.Navigation("Response");
                 });
@@ -2514,8 +2442,6 @@ namespace ESGPlatform.Migrations
                     b.Navigation("FileUploads");
 
                     b.Navigation("Overrides");
-
-                    b.Navigation("StatusHistory");
                 });
 
             modelBuilder.Entity("ESGPlatform.Models.Entities.ReviewAssignment", b =>

@@ -56,15 +56,28 @@ public class QuestionnaireResponseViewModel
     public List<TeamMemberViewModel> TeamMembers { get; set; } = new();
     public bool IsDelegatedUser { get; set; } = false;
     
+    // Review assignment info
+    public bool IsCurrentUserReviewer { get; set; }
+    public bool HasReviewAssignments { get; set; }
+    public int ReviewAssignmentsCount { get; set; }
+    public int PendingReviewsCount { get; set; }
+    public int CompletedReviewsCount { get; set; }
+    
     // Progress tracking
     public int TotalQuestions => Questions.Count;
     public int AnsweredQuestions => Questions.Count(q => q.HasResponse);
     public int DelegatedQuestions => Questions.Count(q => q.IsDelegated);
+    public int ReviewedQuestions => Questions.Count(q => q.ReviewStatus == Entities.ReviewStatus.Approved || q.ReviewStatus == Entities.ReviewStatus.Completed);
+    public int QuestionsNeedingReview => Questions.Count(q => q.IsAssignedForReview && q.HasResponse && (q.ReviewStatus == Entities.ReviewStatus.Pending || q.ReviewStatus == null));
     public int ProgressPercentage => TotalQuestions > 0 ? (AnsweredQuestions * 100) / TotalQuestions : 0;
     
     // Only lead responders can submit, delegated users cannot
     public bool CanSubmit => !IsDelegatedUser && Status == AssignmentStatus.InProgress && AnsweredQuestions == TotalQuestions;
     public bool IsReadOnly => Status == AssignmentStatus.Submitted || Status == AssignmentStatus.UnderReview || Status == AssignmentStatus.Approved;
+    
+    // Review summary
+    public bool HasPendingReviews => QuestionsNeedingReview > 0;
+    public bool CanAccessReviews => IsCurrentUserReviewer || HasReviewAssignments;
 }
 
 public class QuestionResponseViewModel
@@ -102,6 +115,17 @@ public class QuestionResponseViewModel
     public DateTime? DelegatedAt { get; set; }
     public bool IsDelegationCompleted { get; set; }
     
+    // Review assignment info
+    public bool IsAssignedForReview { get; set; }
+    public ReviewStatus? ReviewStatus { get; set; }
+    public int? ReviewAssignmentId { get; set; }
+    public string? ReviewerName { get; set; }
+    public string? ReviewInstructions { get; set; }
+    public bool IsCurrentUserReviewer { get; set; }
+    public DateTime? ReviewAssignedAt { get; set; }
+    public int ReviewCommentsCount { get; set; }
+    public bool HasUnresolvedComments { get; set; }
+    
     // State flags
     public bool HasResponse => !string.IsNullOrEmpty(TextValue) || NumericValue.HasValue || 
                                DateValue.HasValue || BooleanValue.HasValue || 
@@ -109,6 +133,27 @@ public class QuestionResponseViewModel
     public bool CanDelegate { get; set; } = true;
     public bool CanAnswer => !IsDelegated || IsDelegationCompleted;
     public bool IsConditionallyVisible { get; set; } = true; // For conditional question logic
+    
+    // Review status display
+    public string ReviewStatusDisplay => ReviewStatus switch
+    {
+        Entities.ReviewStatus.Pending => "Pending Review",
+        Entities.ReviewStatus.InReview => "Under Review", 
+        Entities.ReviewStatus.Approved => "Approved",
+        Entities.ReviewStatus.ChangesRequested => "Changes Requested",
+        Entities.ReviewStatus.Completed => "Review Complete",
+        _ => "Not Reviewed"
+    };
+    
+    public string ReviewStatusBadgeClass => ReviewStatus switch
+    {
+        Entities.ReviewStatus.Pending => "bg-warning",
+        Entities.ReviewStatus.InReview => "bg-info",
+        Entities.ReviewStatus.Approved => "bg-success",
+        Entities.ReviewStatus.ChangesRequested => "bg-danger",
+        Entities.ReviewStatus.Completed => "bg-success",
+        _ => "bg-secondary"
+    };
 }
 
 public class SaveResponseRequest
@@ -271,6 +316,31 @@ public class AssignReviewerViewModel
     public List<Question> Questions { get; set; } = new();
     public List<string> AvailableSections { get; set; } = new();
     public List<ReviewAssignment> ExistingAssignments { get; set; } = new();
+    
+    // Add assignment property for compatibility with existing views
+    public CampaignAssignment Assignment { get; set; } = null!;
+    
+    // Organize questions by sections for the view
+    public Dictionary<string, List<Question>> QuestionsBySections { get; set; } = new();
+    
+    // Computed properties for statistics
+    public int TotalQuestions => Questions.Count;
+    public int TotalAssignments => ExistingAssignments.Count;
+    public int AvailableReviewersCount => AvailableReviewers.Count;
+    public int UnassignedQuestions => TotalQuestions - ExistingAssignments.Count(ea => ea.QuestionId.HasValue);
+    
+    // Section-based statistics
+    public int AssignedSections => ExistingAssignments.Count(ea => !string.IsNullOrEmpty(ea.SectionName));
+    public int TotalSections => AvailableSections.Count;
+    
+    // Assignment progress
+    public decimal AssignmentProgressPercentage => TotalQuestions > 0 ? 
+        ((decimal)TotalAssignments / TotalQuestions) * 100 : 0;
+    
+    // Get assignments by reviewer for display
+    public Dictionary<string, List<ReviewAssignment>> AssignmentsByReviewer => 
+        ExistingAssignments.GroupBy(ea => ea.ReviewerId)
+                          .ToDictionary(g => g.Key, g => g.ToList());
 }
 
 public class AssignQuestionReviewerRequest
@@ -413,6 +483,28 @@ public class ReviewSummaryStats
     public int ApprovedReviews { get; set; }
     public int ChangesRequestedReviews { get; set; }
     public int CompletedReviews { get; set; }
+}
+
+public class ReviewAssignmentViewModel
+{
+    public int Id { get; set; }
+    public string CampaignName { get; set; } = string.Empty;
+    public string QuestionnaireTitle { get; set; } = string.Empty;
+    public string TargetOrganizationName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime? DueDate { get; set; }
+    
+    // Question-specific properties (for individual question reviews)
+    public string? QuestionText { get; set; }
+    public int? QuestionDisplayOrder { get; set; }
+    
+    // Section-specific properties (for section reviews)
+    public string? SectionName { get; set; }
+    
+    // Review details
+    public string? ReviewerName { get; set; }
+    public string? Instructions { get; set; }
 }
 
 #endregion 

@@ -30,6 +30,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole, string
     public DbSet<CampaignAssignment> CampaignAssignments { get; set; }
     public DbSet<Response> Responses { get; set; }
     public DbSet<ResponseChange> ResponseChanges { get; set; }
+    public DbSet<ResponseStatusHistory> ResponseStatusHistories { get; set; }
     public DbSet<QuestionChange> QuestionChanges { get; set; }
     public DbSet<Delegation> Delegations { get; set; }
     public DbSet<FileUpload> FileUploads { get; set; }

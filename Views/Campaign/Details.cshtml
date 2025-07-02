@@ -7,7 +7,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h1><i class="bi bi-megaphone"></i> @Model.Name</h1>
-        <span class="badge @GetStatusBadgeClass(Model.Status) fs-6">@Model.Status</span>
+        <span class="badge @GetStatusBadgeClass(Model.Status) fs-6">@GetStatusDisplayName(Model.Status)</span>
     </div>
     @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
     {
@@ -18,6 +18,12 @@
             <a asp-action="ManageAssignments" asp-route-id="@Model.Id" class="btn btn-outline-info">
                 <i class="bi bi-people"></i> Manage Assignments
             </a>
+            @if (ViewBag.CanCloseCampaign == true)
+            {
+                <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#closeCampaignModal">
+                    <i class="bi bi-check-circle"></i> Close Campaign
+                </button>
+            }
         </div>
     }
 </div>
@@ -232,7 +238,7 @@
                         </div>
                     </div>
                     <div class="col-6">
-                        <h4 class="text-success">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved)</h4>
+                        <h4 class="text-success">@Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Submitted || a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved)</h4>
                         <small class="text-muted">Completed</small>
                     </div>
                 </div>
@@ -288,6 +294,47 @@
     </a>
 </div>
 
+<!-- Close Campaign Modal -->
+@if (ViewBag.CanCloseCampaign == true)
+{
+    <div class="modal fade" id="closeCampaignModal" tabindex="-1" aria-labelledby="closeCampaignModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="closeCampaignModalLabel">
+                        <i class="bi bi-check-circle"></i> Close Campaign
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>All assignments have been submitted!</strong>
+                        <p class="mb-0 mt-2">This campaign is ready to be closed. Once closed, the campaign status will be marked as "Completed" and no further modifications can be made.</p>
+                    </div>
+                    <p>Are you sure you want to close the campaign "<strong>@Model.Name</strong>"?</p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check text-success"></i> Total Assignments: @Model.Assignments.Count()</li>
+                        <li><i class="bi bi-check text-success"></i> Completed: @Model.Assignments.Count(a => a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Submitted || a.Status == ESGPlatform.Models.Entities.AssignmentStatus.Approved)</li>
+                        <li><i class="bi bi-check text-success"></i> All assignments submitted</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <form asp-action="CloseCampaign" method="post" class="d-inline">
+                        <input type="hidden" name="id" value="@Model.Id" />
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Yes, Close Campaign
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @functions {
     string GetStatusBadgeClass(ESGPlatform.Models.Entities.CampaignStatus status)
     {
@@ -299,6 +346,19 @@
             ESGPlatform.Models.Entities.CampaignStatus.Completed => "bg-primary",
             ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "bg-danger",
             _ => "bg-secondary"
+        };
+    }
+    
+    string GetStatusDisplayName(ESGPlatform.Models.Entities.CampaignStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.Entities.CampaignStatus.Draft => "Draft",
+            ESGPlatform.Models.Entities.CampaignStatus.Active => "Open",
+            ESGPlatform.Models.Entities.CampaignStatus.Paused => "Paused",
+            ESGPlatform.Models.Entities.CampaignStatus.Completed => "Closed",
+            ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "Cancelled",
+            _ => status.ToString()
         };
     }
 

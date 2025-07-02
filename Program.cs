@@ -77,6 +77,8 @@ builder.Services.AddScoped<IQuestionAssignmentTrackingService, QuestionAssignmen
 builder.Services.AddScoped<IExcelImportService, ExcelImportService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IConditionalQuestionService, ConditionalQuestionService>();
+builder.Services.AddScoped<IAnswerPrePopulationService, AnswerPrePopulationService>();
+builder.Services.AddScoped<IResponseWorkflowService, ResponseWorkflowService>();
 
 // Configure authorization policies
 builder.Services.AddAuthorization(options =>
@@ -86,9 +88,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("OrgAdminOrHigher", policy => policy.RequireRole("PlatformAdmin", "OrgAdmin"));
     options.AddPolicy("CampaignManager", policy => policy.RequireRole("CampaignManager"));
     options.AddPolicy("CampaignManagerOrHigher", policy => policy.RequireRole("PlatformAdmin", "OrgAdmin", "CampaignManager"));
-    options.AddPolicy("LeadResponder", policy => policy.RequireRole("LeadResponder"));
-    options.AddPolicy("Responder", policy => policy.RequireRole("Responder"));
-    options.AddPolicy("Reviewer", policy => policy.RequireRole("Reviewer"));
+    options.AddPolicy("LeadResponder", policy => policy.RequireRole("PlatformAdmin", "LeadResponder"));
+    options.AddPolicy("Responder", policy => policy.RequireRole("PlatformAdmin", "LeadResponder", "Responder"));
+    options.AddPolicy("Reviewer", policy => policy.RequireRole("PlatformAdmin", "Reviewer"));
 });
 
 var app = builder.Build();

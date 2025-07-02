@@ -1,0 +1,301 @@
+@model ESGPlatform.Models.ViewModels.ReviewQuestionsViewModel
+@using ESGPlatform.Models.Entities
+@{
+    ViewData["Title"] = "Review Questions";
+}
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-clipboard-check"></i> Review Assignment</h2>
+                    <p class="text-muted mb-0">
+                        Campaign: <strong>@Model.CampaignName</strong> | 
+                        Questionnaire: <strong>@Model.QuestionnaireTitle</strong>
+                    </p>
+                    <p class="text-muted mb-0">
+                        <span class="badge bg-info">@Model.ReviewAssignment.Scope</span>
+                        @if (!string.IsNullOrEmpty(Model.ReviewAssignment.Instructions))
+                        {
+                            <span class="ms-2">@Model.ReviewAssignment.Instructions</span>
+                        }
+                    </p>
+                </div>
+                <div class="text-end">
+                    <a asp-action="MyReviews" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to My Reviews
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Questions Review -->
+    @if (Model.QuestionReviews.Any())
+    {
+        <div class="row">
+            <div class="col-12">
+                <h5><i class="bi bi-list-check"></i> Questions to Review (@Model.QuestionsWithResponses responses)</h5>
+            </div>
+        </div>
+
+        @foreach (var questionReview in Model.QuestionReviews.Where(qr => qr.HasResponse))
+        {
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">Question @questionReview.Question.DisplayOrder</h6>
+                                    <p class="mb-0">@questionReview.Question.QuestionText</p>
+                                    @if (!string.IsNullOrEmpty(questionReview.Question.HelpText))
+                                    {
+                                        <small class="text-muted">@questionReview.Question.HelpText</small>
+                                    }
+                                </div>
+                                <div class="text-end">
+                                    @{
+                                        var latestComment = questionReview.Comments.OrderByDescending(c => c.CreatedAt).FirstOrDefault();
+                                        var currentStatus = latestComment?.ActionTaken ?? ReviewStatus.Pending;
+                                        
+                                        // Only show "Changes Requested" if there's actually a comment requiring changes
+                                        var hasActualChangeRequest = latestComment != null && 
+                                            (latestComment.ActionTaken == ReviewStatus.ChangesRequested || latestComment.RequiresChange);
+                                        
+                                        var statusBadgeClass = currentStatus switch {
+                                            ReviewStatus.Approved => "bg-success",
+                                            ReviewStatus.ChangesRequested when hasActualChangeRequest => "bg-danger",
+                                            ReviewStatus.InReview => "bg-info", 
+                                            ReviewStatus.Completed => "bg-success",
+                                            _ => "bg-warning"
+                                        };
+                                        
+                                        var statusText = currentStatus switch {
+                                            ReviewStatus.Approved => "Approved",
+                                            ReviewStatus.ChangesRequested when hasActualChangeRequest => "Changes Requested",
+                                            ReviewStatus.InReview => "In Review",
+                                            ReviewStatus.Completed => "Completed",
+                                            _ => "Pending Review"
+                                        };
+                                    }
+                                    <span class="badge @statusBadgeClass mb-2">@statusText</span><br/>
+                                    @if (questionReview.Question.IsRequired)
+                                    {
+                                        <span class="badge bg-warning">Required</span>
+                                    }
+                                    <span class="badge bg-primary">@questionReview.Question.QuestionType</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Response Display -->
+                            <div class="bg-light p-3 rounded mb-3">
+                                <h6><i class="bi bi-chat-quote"></i> Response</h6>
+                                <div class="response-content">
+                                    @questionReview.ResponseText
+                                </div>
+                                @if (questionReview.Response?.FileUploads?.Count > 0)
+                                {
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="bi bi-paperclip"></i> @questionReview.Response.FileUploads.Count file(s) attached
+                                        </small>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Existing Comments -->
+                            @if (questionReview.Comments.Any())
+                            {
+                                <div class="mb-3">
+                                    <h6><i class="bi bi-chat-left-text"></i> Review History</h6>
+                                    @foreach (var comment in questionReview.Comments.OrderBy(c => c.CreatedAt))
+                                    {
+                                        <div class="border-start border-3 border-info ps-3 mb-2">
+                                            <div class="d-flex justify-content-between">
+                                                <strong>@comment.Reviewer.FullName</strong>
+                                                <small class="text-muted">@comment.CreatedAt.ToString("MMM dd, yyyy HH:mm")</small>
+                                            </div>
+                                            <p class="mb-1">@comment.Comment</p>
+                                            <div>
+                                                @{
+                                                    var actionBadgeClass = comment.ActionTaken switch {
+                                                        ReviewStatus.Approved => "bg-success",
+                                                        ReviewStatus.ChangesRequested => "bg-danger",
+                                                        ReviewStatus.InReview => "bg-info",
+                                                        _ => "bg-secondary"
+                                                    };
+                                                }
+                                                <span class="badge @actionBadgeClass">@comment.ActionTaken</span>
+                                                @if (comment.RequiresChange)
+                                                {
+                                                    <span class="badge bg-warning">Changes Required</span>
+                                                }
+                                                @if (comment.IsResolved)
+                                                {
+                                                    <span class="badge bg-success">Resolved</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <!-- Review Actions -->
+                            <div class="review-actions">
+                                <form asp-action="ReviewWithComments" method="post" class="review-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="reviewAssignmentId" value="@Model.ReviewAssignment.Id" />
+                                    <input type="hidden" name="responseId" value="@questionReview.Response?.Id" />
+                                    
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="mb-3">
+                                                <label class="form-label">Review Comment</label>
+                                                <textarea name="comment" class="form-control" rows="3" 
+                                                         placeholder="Add your review comments here (required for changes requested)"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Action</label>
+                                                <div class="d-grid gap-2">
+                                                    @if (currentStatus != ReviewStatus.Approved)
+                                                    {
+                                                        <button type="submit" name="actionTaken" value="@ReviewStatus.Approved" 
+                                                                class="btn btn-success btn-sm">
+                                                            <i class="bi bi-check-circle"></i> Approve
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="submit" name="actionTaken" value="@ReviewStatus.InReview" 
+                                                                class="btn btn-warning btn-sm">
+                                                            <i class="bi bi-arrow-counterclockwise"></i> Un-approve
+                                                        </button>
+                                                    }
+                                                    <button type="submit" name="actionTaken" value="@ReviewStatus.ChangesRequested" 
+                                                            name="requiresChange" value="true"
+                                                            class="btn btn-outline-danger btn-sm">
+                                                        <i class="bi bi-exclamation-triangle"></i> Request Changes
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Review Summary -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6><i class="bi bi-info-circle"></i> Review Summary</h6>
+                        @{
+                            var totalQuestions = Model.QuestionReviews.Count(qr => qr.HasResponse);
+                            var approvedQuestions = Model.QuestionReviews.Count(qr => qr.HasResponse && 
+                                qr.Comments.OrderByDescending(c => c.CreatedAt).FirstOrDefault()?.ActionTaken == ReviewStatus.Approved);
+                            var changesRequestedQuestions = Model.QuestionReviews.Count(qr => qr.HasResponse && 
+                                qr.Comments.Any() && 
+                                qr.Comments.OrderByDescending(c => c.CreatedAt).FirstOrDefault()?.ActionTaken == ReviewStatus.ChangesRequested);
+                            var pendingQuestions = totalQuestions - approvedQuestions - changesRequestedQuestions;
+                            var questionsWithComments = Model.QuestionReviews.Count(qr => qr.Comments.Any());
+                        }
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-primary">@totalQuestions</h4>
+                                    <small class="text-muted">Questions with Responses</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-success">@approvedQuestions</h4>
+                                    <small class="text-muted">Approved</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-warning">@pendingQuestions</h4>
+                                    <small class="text-muted">Pending Review</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-danger">@changesRequestedQuestions</h4>
+                                    <small class="text-muted">Changes Requested</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="text-center">
+                                    <small class="text-muted">
+                                        Review Assignment Status: 
+                                        @{
+                                            var assignmentStatusClass = Model.ReviewAssignment.Status switch {
+                                                ReviewStatus.Pending => "bg-warning",
+                                                ReviewStatus.InReview => "bg-info",
+                                                ReviewStatus.Approved => "bg-success", 
+                                                ReviewStatus.ChangesRequested => "bg-danger",
+                                                ReviewStatus.Completed => "bg-success",
+                                                _ => "bg-secondary"
+                                            };
+                                        }
+                                        <span class="badge @assignmentStatusClass">@Model.ReviewAssignment.Status</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-exclamation-triangle"></i> No Responses to Review</h6>
+                    <p class="mb-0">There are no responses available for review in this assignment yet.</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validate review forms
+    const reviewForms = document.querySelectorAll('.review-form');
+    reviewForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const actionTaken = e.submitter?.value;
+            const comment = form.querySelector('textarea[name="comment"]').value;
+            
+            // Only require comment for requesting changes
+            if (actionTaken === '@ReviewStatus.ChangesRequested' && !comment.trim()) {
+                e.preventDefault();
+                alert('Please provide a comment when requesting changes.');
+                return false;
+            }
+            
+            // Optional: require comment for un-approve to provide explanation
+            if (actionTaken === '@ReviewStatus.InReview' && !comment.trim()) {
+                e.preventDefault();
+                alert('Please provide a comment explaining why you are un-approving this response.');
+                return false;
+            }
+        });
+    });
+});
+</script> 

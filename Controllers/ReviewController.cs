@@ -31,8 +31,8 @@ public class ReviewController : BaseController
         var assignment = await GetCampaignAssignmentWithAccessCheck(id.Value);
         if (assignment == null) return NotFound();
 
-        // Only lead responder can assign reviewers
-        if (assignment.LeadResponderId != CurrentUserId)
+        // Only lead responder or platform admin can assign reviewers
+        if (assignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
         {
             return Forbid();
         }
@@ -63,7 +63,7 @@ public class ReviewController : BaseController
         var assignment = await GetCampaignAssignmentWithAccessCheck(request.CampaignAssignmentId);
         if (assignment == null) return NotFound();
 
-        if (assignment.LeadResponderId != CurrentUserId)
+        if (assignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
         {
             return Forbid();
         }
@@ -102,7 +102,7 @@ public class ReviewController : BaseController
         var assignment = await GetCampaignAssignmentWithAccessCheck(request.CampaignAssignmentId);
         if (assignment == null) return NotFound();
 
-        if (assignment.LeadResponderId != CurrentUserId)
+        if (assignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
         {
             return Forbid();
         }
@@ -127,6 +127,93 @@ public class ReviewController : BaseController
         }
     }
 
+    // POST: Review/AssignBulkReviewer
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = "LeadResponder")]
+    public async Task<IActionResult> AssignBulkReviewer(int CampaignAssignmentId, string ReviewerId, string? Instructions, string Scope)
+    {
+        if (string.IsNullOrEmpty(ReviewerId))
+        {
+            TempData["Error"] = "Please select a reviewer.";
+            return RedirectToAction(nameof(AssignReviewer), new { id = CampaignAssignmentId });
+        }
+
+        var assignment = await GetCampaignAssignmentWithAccessCheck(CampaignAssignmentId);
+        if (assignment == null) return NotFound();
+
+        if (assignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            if (Scope == "Assignment")
+            {
+                await _reviewService.AssignAssignmentReviewerAsync(
+                    CampaignAssignmentId,
+                    ReviewerId,
+                    CurrentUserId,
+                    Instructions
+                );
+
+                TempData["Success"] = "Reviewer assigned to entire assignment successfully!";
+            }
+            else
+            {
+                TempData["Error"] = "Invalid assignment scope.";
+            }
+
+            return RedirectToAction(nameof(AssignReviewer), new { id = CampaignAssignmentId });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already assigned"))
+        {
+            TempData["Error"] = "This reviewer is already assigned to this assignment. Please remove the existing assignment first or choose a different reviewer.";
+            return RedirectToAction(nameof(AssignReviewer), new { id = CampaignAssignmentId });
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Error assigning reviewer: {ex.Message}";
+            return RedirectToAction(nameof(AssignReviewer), new { id = CampaignAssignmentId });
+        }
+    }
+
+    // POST: Review/RemoveReviewAssignment
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = "LeadResponder")]
+    public async Task<IActionResult> RemoveReviewAssignment(int assignmentId)
+    {
+        var reviewAssignment = await _context.ReviewAssignments
+            .Include(ra => ra.CampaignAssignment)
+            .FirstOrDefaultAsync(ra => ra.Id == assignmentId);
+
+        if (reviewAssignment == null) return NotFound();
+
+        var campaignAssignment = await GetCampaignAssignmentWithAccessCheck(reviewAssignment.CampaignAssignmentId);
+        if (campaignAssignment == null) return NotFound();
+
+        if (campaignAssignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            _context.ReviewAssignments.Remove(reviewAssignment);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Review assignment removed successfully!";
+            return RedirectToAction(nameof(AssignReviewer), new { id = reviewAssignment.CampaignAssignmentId });
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Error removing review assignment: {ex.Message}";
+            return RedirectToAction(nameof(AssignReviewer), new { id = reviewAssignment.CampaignAssignmentId });
+        }
+    }
+
     #endregion
 
     #region Reviewer Interface
@@ -137,23 +224,21 @@ public class ReviewController : BaseController
     {
         var reviewAssignments = await _reviewService.GetReviewAssignmentsForUserAsync(CurrentUserId);
         
-        var model = new MyReviewsViewModel
+        var model = reviewAssignments.Select(ra => new ReviewAssignmentViewModel
         {
-            ReviewAssignments = reviewAssignments.Select(ra => new ReviewAssignmentSummaryViewModel
-            {
-                Id = ra.Id,
-                CampaignName = ra.CampaignAssignment.Campaign.Name,
-                QuestionnaireTitle = ra.CampaignAssignment.QuestionnaireVersion?.Questionnaire?.Title ?? "Unknown",
-                OrganizationName = ra.CampaignAssignment.TargetOrganization.Name,
-                Scope = ra.Scope,
-                QuestionText = ra.Question?.QuestionText,
-                SectionName = ra.SectionName,
-                Status = ra.Status,
-                Instructions = ra.Instructions,
-                CreatedAt = ra.CreatedAt,
-                PendingCommentsCount = ra.Comments.Count(c => !c.IsResolved)
-            }).ToList()
-        };
+            Id = ra.Id,
+            CampaignName = ra.CampaignAssignment.Campaign.Name,
+            QuestionnaireTitle = ra.CampaignAssignment.QuestionnaireVersion?.Questionnaire?.Title ?? "Unknown",
+            TargetOrganizationName = ra.CampaignAssignment.TargetOrganization.Name,
+            Status = ra.Status.ToString(),
+            CreatedAt = ra.CreatedAt,
+            DueDate = null, // Review assignments don't have due dates currently
+            QuestionText = ra.Question?.QuestionText,
+            QuestionDisplayOrder = ra.Question?.DisplayOrder,
+            SectionName = ra.SectionName,
+            ReviewerName = ra.Reviewer?.FullName,
+            Instructions = ra.Instructions
+        }).ToList();
 
         return View(model);
     }
@@ -278,6 +363,94 @@ public class ReviewController : BaseController
         }
     }
 
+    // POST: Review/QuickApprove - Approve without requiring comments
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = "Reviewer")]
+    public async Task<IActionResult> QuickApprove(int reviewAssignmentId)
+    {
+        var reviewAssignment = await _context.ReviewAssignments
+            .Include(ra => ra.CampaignAssignment)
+                .ThenInclude(ca => ca.Responses)
+            .FirstOrDefaultAsync(ra => ra.Id == reviewAssignmentId);
+
+        if (reviewAssignment == null || reviewAssignment.ReviewerId != CurrentUserId)
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            // Update review assignment status
+            reviewAssignment.Status = ReviewStatus.Approved;
+            reviewAssignment.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = "Review approved successfully!";
+            return RedirectToAction(nameof(MyReviews));
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Error approving review: {ex.Message}";
+            return RedirectToAction(nameof(ReviewQuestions), new { id = reviewAssignmentId });
+        }
+    }
+
+    // POST: Review/ReviewWithComments - Submit review with comments
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Policy = "Reviewer")]
+    public async Task<IActionResult> ReviewWithComments(int reviewAssignmentId, int responseId, string comment, ReviewStatus actionTaken, bool requiresChange)
+    {
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            TempData["Error"] = "Comment is required when reviewing with feedback.";
+            return RedirectToAction(nameof(ReviewQuestions), new { id = reviewAssignmentId });
+        }
+
+        var reviewAssignment = await _context.ReviewAssignments
+            .FirstOrDefaultAsync(ra => ra.Id == reviewAssignmentId);
+
+        if (reviewAssignment == null || reviewAssignment.ReviewerId != CurrentUserId)
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            // Add the comment
+            await _reviewService.AddReviewCommentAsync(
+                reviewAssignmentId,
+                responseId,
+                CurrentUserId!,
+                comment,
+                actionTaken,
+                requiresChange
+            );
+
+            // Update review assignment status
+            reviewAssignment.Status = actionTaken;
+            reviewAssignment.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            string statusMessage = actionTaken switch
+            {
+                ReviewStatus.Approved => "Response approved with comments!",
+                ReviewStatus.ChangesRequested => "Changes requested successfully!",
+                _ => "Review comment added successfully!"
+            };
+
+            TempData["Success"] = statusMessage;
+            return RedirectToAction(nameof(ReviewQuestions), new { id = reviewAssignmentId });
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = $"Error adding review comment: {ex.Message}";
+            return RedirectToAction(nameof(ReviewQuestions), new { id = reviewAssignmentId });
+        }
+    }
+
     #endregion
 
     #region Review Status and Audit
@@ -346,13 +519,15 @@ public class ReviewController : BaseController
             .Where(u => u.OrganizationId == CurrentOrganizationId && u.IsActive)
             .ToListAsync();
 
-        // Filter to only users with Reviewer role
+        // Filter to users who can act as reviewers (Reviewer, PlatformAdmin, or other appropriate roles)
         var reviewers = new List<User>();
+        var allowedReviewerRoles = new[] { "Reviewer", "PlatformAdmin", "OrgAdmin", "CampaignManager" };
+        
         foreach (var user in reviewerUsers)
         {
             var roles = await _context.UserRoles
                 .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => new { ur.UserId, r.Name })
-                .Where(x => x.UserId == user.Id && x.Name == "Reviewer")
+                .Where(x => x.UserId == user.Id && allowedReviewerRoles.Contains(x.Name))
                 .ToListAsync();
             
             if (roles.Any())
@@ -363,14 +538,28 @@ public class ReviewController : BaseController
 
         model.AvailableReviewers = reviewers;
 
-        // Get questions for this assignment
+        // Get the full assignment with all necessary data
         var assignment = await _context.CampaignAssignments
+            .Include(ca => ca.Campaign)
+            .Include(ca => ca.TargetOrganization)
             .Include(ca => ca.QuestionnaireVersion)
                 .ThenInclude(qv => qv.Questionnaire)
                     .ThenInclude(q => q.Questions)
+            .Include(ca => ca.LeadResponder)
             .FirstOrDefaultAsync(ca => ca.Id == model.CampaignAssignmentId);
 
-        model.Questions = assignment?.QuestionnaireVersion?.Questionnaire?.Questions?.ToList() ?? new List<Question>();
+        if (assignment == null)
+            throw new ArgumentException($"Campaign assignment with ID {model.CampaignAssignmentId} not found");
+
+        // Set the assignment property for view compatibility
+        model.Assignment = assignment;
+
+        // Get questions and order them
+        var questions = assignment.QuestionnaireVersion?.Questionnaire?.Questions?
+            .OrderBy(q => q.DisplayOrder)
+            .ToList() ?? new List<Question>();
+        
+        model.Questions = questions;
 
         // Get existing review assignments
         model.ExistingAssignments = await _context.ReviewAssignments
@@ -380,11 +569,21 @@ public class ReviewController : BaseController
             .ToListAsync();
 
         // Get available sections
-        model.AvailableSections = model.Questions
+        model.AvailableSections = questions
             .Where(q => !string.IsNullOrEmpty(q.Section))
             .Select(q => q.Section!)
             .Distinct()
+            .OrderBy(s => s)
             .ToList();
+
+        // Build QuestionsBySections dictionary
+        model.QuestionsBySections = questions
+            .GroupBy(q => string.IsNullOrEmpty(q.Section) ? "Other" : q.Section)
+            .OrderBy(g => g.Key == "Other" ? "zzz" : g.Key) // Put "Other" section last
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderBy(q => q.DisplayOrder).ToList()
+            );
     }
 
     private async Task<ReviewQuestionsViewModel> BuildReviewQuestionsViewModel(ReviewAssignment reviewAssignment)

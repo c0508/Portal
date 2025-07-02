@@ -8,12 +8,17 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-megaphone"></i> Campaigns</h1>
-    @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
-    {
-        <a asp-action="Create" class="btn btn-primary">
-            <i class="bi bi-plus-circle"></i> Create Campaign
-        </a>
-    }
+    <div>
+        @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin"))
+        {
+            <a asp-action="Dashboard" class="btn btn-outline-info me-2">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+            <a asp-action="Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Create Campaign
+            </a>
+        }
+    </div>
 </div>
 
 @* Show organization context switcher for supplier organizations *@
@@ -52,8 +57,8 @@ else
                             }
                             <h5 class="card-title mb-0 text-white">@campaign.Name</h5>
                         </div>
-                        <span class="badge bg-light text-dark">
-                            @campaign.Status
+                        <span class="badge @GetStatusBadgeClass(campaign.Status) text-white">
+                            @GetStatusDisplayName(campaign.Status)
                         </span>
                     </div>
                     <div class="card-body">
@@ -162,6 +167,19 @@ else
             ESGPlatform.Models.Entities.CampaignStatus.Completed => "bg-primary",
             ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "bg-danger",
             _ => "bg-secondary"
+        };
+    }
+    
+    string GetStatusDisplayName(ESGPlatform.Models.Entities.CampaignStatus status)
+    {
+        return status switch
+        {
+            ESGPlatform.Models.Entities.CampaignStatus.Draft => "Draft",
+            ESGPlatform.Models.Entities.CampaignStatus.Active => "Open",
+            ESGPlatform.Models.Entities.CampaignStatus.Paused => "Paused",
+            ESGPlatform.Models.Entities.CampaignStatus.Completed => "Closed",
+            ESGPlatform.Models.Entities.CampaignStatus.Cancelled => "Cancelled",
+            _ => status.ToString()
         };
     }
 } 
