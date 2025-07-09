@@ -1,0 +1,1334 @@
+@{
+    ViewBag.Title = "Flexible Analytics";
+    Layout = "_Layout";
+}
+
+@model FlexibleAnalyticsViewModel
+
+@* Add anti-forgery token *@
+@Html.AntiForgeryToken()
+
+<!-- Flexible Analytics Dashboard -->
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-chart-bar text-primary me-2"></i>
+                        Flexible Analytics Dashboard
+                    </h2>
+                    <p class="text-muted mb-0">Adaptive analytics that work with any questionnaire</p>
+                </div>
+                <div>
+                    <a href="@Url.Action("Portfolio")" class="btn btn-outline-secondary me-2">
+                        <i class="fas fa-arrow-left me-1"></i>
+                        Back to Portfolio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter text-primary me-2"></i>
+                        Filters
+                        <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="clearFilters()">
+                            Clear All
+                        </button>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="filtersForm" method="get">
+                        <div class="row">
+                            <!-- Years Filter -->
+                            <div class="col-lg-2 col-md-4 mb-3">
+                                <label class="form-label">Years</label>
+                                <select multiple class="form-select" name="years" id="yearsFilter">
+                                    @foreach (var year in Model.AvailableYears)
+                                    {
+                                        <option value="@year" selected="@(Model.Filters.Years.Contains(year))">
+                                            @year
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                                                            <!-- Sections Filter -->
+                            <div class="col-lg-2 col-md-4 mb-3">
+                                <label class="form-label">Sections</label>
+                                <select multiple class="form-select" name="sections" id="sectionsFilter">
+                                    @foreach (var sectionName in Model.AvailableSections)
+                                    {
+                                        <option value="@sectionName" selected="@Model.Filters.Sections.Contains(sectionName)">
+                                            @sectionName
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Questions Filter -->
+                            <div class="col-lg-3 col-md-4 mb-3">
+                                <label class="form-label">Questions</label>
+                                <select multiple class="form-select" name="questionIds" id="questionsFilter">
+                                    @foreach (var question in Model.AvailableQuestions)
+                                    {
+                                        <option value="@question.Id" selected="@Model.Filters.QuestionIds.Contains(question.Id)">
+                                            [@question.Section] @question.Text
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Companies Filter -->
+                            <div class="col-lg-2 col-md-4 mb-3">
+                                <label class="form-label">Companies</label>
+                                <select multiple class="form-select" name="companyIds" id="companiesFilter">
+                                    @foreach (var company in Model.AvailableCompanies)
+                                    {
+                                        <option value="@company.Id" selected="@Model.Filters.CompanyIds.Contains(company.Id)">
+                                            @company.Name (@company.Sector)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Dynamic Attribute Filter (was Sectors) -->
+                            <div class="col-lg-2 col-md-4 mb-3">
+                                <label class="form-label">@Model.PrimaryAttributeDisplayName</label>
+                                <select multiple class="form-select" name="sectors" id="sectorsFilter">
+                                    @foreach (var sector in Model.AvailableSectors)
+                                    {
+                                        <option value="@sector.Name" selected="@Model.Filters.Sectors.Contains(sector.Name)">
+                                            @sector.Name (@sector.CompanyCount)
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-1"></i>
+                                    Apply Filters
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary ms-2" onclick="resetToDefaults()">
+                                    <i class="fas fa-undo me-1"></i>
+                                    Reset to Defaults
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Statistics -->
+    @if (Model.ChartData.Summary.TotalResponses > 0)
+    {
+        <div class="row mb-4">
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">@Model.ChartData.Summary.TotalResponses.ToString("N0")</h4>
+                                <p class="mb-0">Total Responses</p>
+                            </div>
+                            <i class="fas fa-comments fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">@Model.ChartData.Summary.TotalCompanies</h4>
+                                <p class="mb-0">Companies</p>
+                            </div>
+                            <i class="fas fa-building fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">@Model.ChartData.Summary.TotalSectors</h4>
+                                <p class="mb-0">@Model.PrimaryAttributeDisplayName</p>
+                            </div>
+                            <i class="fas fa-tags fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6 mb-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h4 class="mb-0">@Model.ChartData.Summary.ResponseRate.ToString("F1")%</h4>
+                                <p class="mb-0">Response Rate</p>
+                            </div>
+                            <i class="fas fa-chart-line fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Charts Section -->
+    @if (Model.ChartData.PrimaryData.Any() || Model.ChartData.SecondaryData.Any())
+    {
+        <div class="row mb-4">
+            @if (Model.ChartData.PrimaryData.Any())
+            {
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-chart-pie text-primary me-2"></i>
+                                    @Model.ChartData.PrimaryTitle
+                                </h5>
+                                @if (Model.Filters.QuestionIds.Count == 1)
+                                {
+                                    <div class="chart-controls d-flex gap-2">
+                                        @* Show aggregation method dropdown for numeric questions *@
+                                        @{
+                                            var question = Model.AvailableQuestions.FirstOrDefault(q => q.Id == Model.Filters.QuestionIds.First());
+                                            bool isNumeric = question?.Type == "Number";
+                                        }
+                                        @if (isNumeric)
+                                        {
+                                            <select class="form-select form-select-sm" style="width: 150px;" onchange="updateAggregationMethod(this.value)">
+                                                @if (Model.Filters.AggregationMethod == NumericAggregationMethod.Sum)
+                                                {
+                                                    <option value="Sum" selected>Total (Sum)</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="Sum">Total (Sum)</option>
+                                                }
+                                                @if (Model.Filters.AggregationMethod == NumericAggregationMethod.Average)
+                                                {
+                                                    <option value="Average" selected>Average</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="Average">Average</option>
+                                                }
+                                                @if (Model.Filters.AggregationMethod == NumericAggregationMethod.Count)
+                                                {
+                                                    <option value="Count" selected>Count</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="Count">Count</option>
+                                                }
+                                                @if (Model.Filters.AggregationMethod == NumericAggregationMethod.Min)
+                                                {
+                                                    <option value="Min" selected>Minimum</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="Min">Minimum</option>
+                                                }
+                                                @if (Model.Filters.AggregationMethod == NumericAggregationMethod.Max)
+                                                {
+                                                    <option value="Max" selected>Maximum</option>
+                                                }
+                                                else
+                                                {
+                                                    <option value="Max">Maximum</option>
+                                                }
+                                            </select>
+                                        }
+                                        <select class="form-select form-select-sm" id="primaryChartAttribute" onchange="updateChart('primary', this.value)" style="width: 150px;">
+                                            <option value="Company" selected="@(Model.Filters.SelectedAttribute == "Company")">Company</option>
+                                            @foreach (var attr in Model.AvailableAttributes)
+                                            {
+                                                <option value="@attr.Name" selected="@(Model.Filters.SelectedAttribute == attr.Name)">
+                                                    @attr.DisplayName
+                                                </option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="primaryChart" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (Model.ChartData.SecondaryData.Any())
+            {
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-bar text-success me-2"></i>@Model.ChartData.SecondaryTitle
+                            </h5>
+                            @if (!Model.ChartData.SecondaryHideAttributeFilter)
+                            {
+                                <div class="chart-controls">
+                                    <select class="form-select form-select-sm" style="width: auto;" onchange="updateChart('secondary', this.value)">
+                                        <option value="Company" selected="@(Model.Filters.SelectedAttribute == "Company")">Company</option>
+                                        @foreach (var attr in Model.AvailableAttributes)
+                                        {
+                                            <option value="@attr.Name" selected="@(attr.Name == Model.Filters.SelectedAttribute)">
+                                                @attr.DisplayName
+                                            </option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                        </div>
+                        <div class="card-body">
+                            <canvas id="secondaryChart" height="300"></canvas>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Debug message when no charts are available -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>No Charts Available:</strong> 
+                    @if (Model.Filters.QuestionIds.Count == 1)
+                    {
+                        <span>Charts will appear here once data is loaded. Try selecting different filter combinations above.</span>
+                    }
+                    else
+                    {
+                        <span>Select a single question to see detailed charts with dynamic attribute controls.</span>
+                    }
+                    <br/>
+                    <small class="text-muted">
+                        Debug: Primary data (@Model.ChartData.PrimaryData.Count), 
+                        Secondary data (@Model.ChartData.SecondaryData.Count), 
+                        Total responses (@Model.ChartData.Summary.TotalResponses)
+                    </small>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Section Navigation -->
+    @if (Model.AvailableSections.Any() && !Model.Filters.Sections.Any())
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-sitemap text-primary me-2"></i>
+                            Navigate by Section
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            @foreach (var sectionName in Model.AvailableSections)
+                            {
+                                <div class="col-lg-3 col-md-4 col-sm-6 mb-2">
+                                    <a href="?sections=@Uri.EscapeDataString(sectionName)" class="btn btn-outline-primary w-100">
+                                        @sectionName
+                                        <span class="badge bg-secondary ms-2">
+                                            @Model.AvailableQuestions.Count(q => q.Section == sectionName)
+                                        </span>
+                                    </a>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Data Table -->
+    <div class="row">
+        <div class="col-12">
+            <!-- Export and Search Controls -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="tableSearch" placeholder="Search in table data..." value="@Model.Filters.SearchTerm">
+                                <button type="button" class="btn btn-outline-primary" onclick="searchTable()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button type="button" class="btn btn-success" onclick="exportData()">
+                                <i class="fas fa-file-excel me-1"></i>
+                                Export to Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-table text-primary me-2"></i>
+                            Detailed Data
+                            <span class="badge bg-secondary ms-2">@Model.DataTable.TotalRows.ToString("N0") total</span>
+                        </h5>
+                        <div>
+                            <!-- Page Size Selector -->
+                            <select class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="changePageSize(this.value)">
+                                <option value="25" selected="@(Model.DataTable.PageSize == 25)">25 per page</option>
+                                <option value="50" selected="@(Model.DataTable.PageSize == 50)">50 per page</option>
+                                <option value="100" selected="@(Model.DataTable.PageSize == 100)">100 per page</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (Model.DataTable.Rows.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th><a href="javascript:sortBy('CompanyName')" class="text-decoration-none">Company <i class="fas fa-sort"></i></a></th>
+                                        <th><a href="javascript:sortBy('Sector')" class="text-decoration-none">Sector <i class="fas fa-sort"></i></a></th>
+                                        <th><a href="javascript:sortBy('Year')" class="text-decoration-none">Year <i class="fas fa-sort"></i></a></th>
+                                        <th><a href="javascript:sortBy('Section')" class="text-decoration-none">Section <i class="fas fa-sort"></i></a></th>
+                                        <th><a href="javascript:sortBy('QuestionText')" class="text-decoration-none">Question <i class="fas fa-sort"></i></a></th>
+                                        <th>Type</th>
+                                        <th>Value</th>
+                                        <th>Attributes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in Model.DataTable.Rows)
+                                    {
+                                        <tr>
+                                            <td class="fw-medium">@row.CompanyName</td>
+                                            <td><span class="badge bg-light text-dark">@row.Sector</span></td>
+                                            <td>@row.Year</td>
+                                            <td><span class="badge bg-info">@row.Section</span></td>
+                                            <td class="text-break" style="max-width: 300px;">
+                                                @row.QuestionText
+                                            </td>
+                                            <td><span class="badge bg-secondary">@row.QuestionType</span></td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(row.FormattedValue))
+                                                {
+                                                    @if (row.QuestionType == "YesNo")
+                                                    {
+                                                        @if (row.BooleanValue == true)
+                                                        {
+                                                            <span class="badge bg-success">@row.FormattedValue</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-danger">@row.FormattedValue</span>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-break">@row.FormattedValue</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No response</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (row.OrganizationAttributes.Any())
+                                                {
+                                                    @foreach (var attr in row.OrganizationAttributes.Take(3))
+                                                    {
+                                                        <small class="d-block text-muted">@attr.Key: @attr.Value</small>
+                                                    }
+                                                    @if (row.OrganizationAttributes.Count > 3)
+                                                    {
+                                                        <small class="text-muted">+@(row.OrganizationAttributes.Count - 3) more</small>
+                                                    }
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        @if (Model.DataTable.TotalPages > 1)
+                        {
+                            <nav aria-label="Data table pagination">
+                                <ul class="pagination justify-content-center">
+                                    <!-- Previous -->
+                                    <li class="page-item @(Model.DataTable.Page <= 1 ? "disabled" : "")">
+                                        <a class="page-link" href="javascript:goToPage(@(Model.DataTable.Page - 1))">Previous</a>
+                                    </li>
+
+                                    <!-- Page Numbers -->
+                                    @{
+                                        var startPage = Math.Max(1, Model.DataTable.Page - 2);
+                                        var endPage = Math.Min(Model.DataTable.TotalPages, Model.DataTable.Page + 2);
+                                    }
+
+                                    @if (startPage > 1)
+                                    {
+                                        <li class="page-item"><a class="page-link" href="javascript:goToPage(1)">1</a></li>
+                                        @if (startPage > 2)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        }
+                                    }
+
+                                    @for (var i = startPage; i <= endPage; i++)
+                                    {
+                                        <li class="page-item @(i == Model.DataTable.Page ? "active" : "")">
+                                            <a class="page-link" href="javascript:goToPage(@i)">@i</a>
+                                        </li>
+                                    }
+
+                                    @if (endPage < Model.DataTable.TotalPages)
+                                    {
+                                        @if (endPage < Model.DataTable.TotalPages - 1)
+                                        {
+                                            <li class="page-item disabled"><span class="page-link">...</span></li>
+                                        }
+                                        <li class="page-item"><a class="page-link" href="javascript:goToPage(@Model.DataTable.TotalPages)">@Model.DataTable.TotalPages</a></li>
+                                    }
+
+                                    <!-- Next -->
+                                    <li class="page-item @(Model.DataTable.Page >= Model.DataTable.TotalPages ? "disabled" : "")">
+                                        <a class="page-link" href="javascript:goToPage(@(Model.DataTable.Page + 1))">Next</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No data found</h5>
+                            <p class="text-muted">Try adjusting your filters to see more results.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <style>
+        .chart-controls {
+            position: relative;
+        }
+        
+        .chart-controls select {
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #dee2e6;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+        }
+        
+        .chart-controls select:hover {
+            background-color: white;
+            border-color: #0d6efd;
+        }
+        
+        .chart-controls select:focus {
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        }
+        
+        /* Ensure chart containers maintain proper size */
+        #primaryChart, #secondaryChart {
+            width: 100% !important;
+            height: 400px !important;
+            min-height: 400px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            overflow: hidden;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Declare chart variables at the top
+        let primaryChart = null;
+        let secondaryChart = null;
+
+        // Helper function for colors
+        function getDefaultColor(index) {
+            const colors = [
+                "#0d6efd", "#20c997", "#fd7e14", "#6f42c1", "#dc3545",
+                "#198754", "#0dcaf0", "#f8d7da", "#d1ecf1", "#d4edda"
+            ];
+            return colors[index % colors.length];
+        }
+
+        // Chart initialization
+        @if (Model.ChartData.PrimaryData.Any())
+        {
+            var primaryColors = Model.ChartData.PrimaryData.Select((d, i) => d.Color ?? GetDefaultColor(i)).ToList();
+            <text>
+            console.log('Primary data:', @Html.Raw(Json.Serialize(Model.ChartData.PrimaryData.Select(d => new { d.Label, d.Value, d.Category }))));
+            const primaryCtx = document.getElementById('primaryChart').getContext('2d');
+            primaryChart = new Chart(primaryCtx, {
+                type: '@Model.ChartData.PrimaryChartType',
+                data: {
+                    labels: @Html.Raw(Json.Serialize(Model.ChartData.PrimaryData.Select(d => d.Label))),
+                    datasets: [{
+                        label: '@Model.ChartData.PrimaryTitle',
+                        data: @Html.Raw(Json.Serialize(Model.ChartData.PrimaryData.Select(d => d.Value))),
+                        backgroundColor: @Html.Raw(Json.Serialize(primaryColors)),
+                        borderColor: @Html.Raw(Json.Serialize(primaryColors)),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 300
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    return value;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: '@Model.ChartData.PrimaryChartType' === 'pie',
+                            position: '@(Model.ChartData.PrimaryChartType == "pie" ? "bottom" : "top")'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    var label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed;
+                                    if ('@Model.ChartData.PrimaryChartType' === 'pie') {
+                                        var total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        var percentage = Math.round((context.parsed / total) * 100);
+                                        label += ' (' + percentage + '%)';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    onResize: function(chart, size) {
+                        console.log('Primary chart resized:', size);
+                    }
+                }
+            });
+            </text>
+        }
+
+        @if (Model.ChartData.SecondaryData.Any())
+        {
+            <text>
+            console.log('Secondary data:', @Html.Raw(Json.Serialize(Model.ChartData.SecondaryData.Select(d => new { d.Label, d.Value, d.Category }))));
+            const secondaryCtx = document.getElementById('secondaryChart').getContext('2d');
+            
+            // Check if this is time evolution data (has categories)
+            const secondaryData = @Html.Raw(Json.Serialize(Model.ChartData.SecondaryData.Select(d => new { label = d.Label, value = d.Value, category = d.Category })));
+            const hasCategories = secondaryData.some(d => d.category && d.category.length > 0);
+            
+            console.log('Secondary data structure:', secondaryData);
+            console.log('Has categories:', hasCategories);
+            
+            if (hasCategories) {
+                // Time evolution or stacked chart
+                const categories = [...new Set(secondaryData.map(d => d.category).filter(c => c))];
+                const labels = [...new Set(secondaryData.map(d => d.label))];
+                
+                console.log('Time evolution categories:', categories);
+                console.log('Time evolution labels:', labels);
+                
+                const datasets = categories.map((category, index) => {
+                    const categoryData = secondaryData.filter(d => d.category === category);
+                    return {
+                        label: category,
+                        data: labels.map(label => {
+                            const item = categoryData.find(d => d.label === label);
+                            return item ? item.value : 0;
+                        }),
+                        backgroundColor: getDefaultColor(index),
+                        borderColor: getDefaultColor(index),
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    };
+                });
+                
+                secondaryChart = new Chart(secondaryCtx, {
+                    type: '@Model.ChartData.SecondaryChartType',
+                    data: {
+                        labels: labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 300
+                        },
+                        @if (Model.ChartData.SecondaryIsStacked)
+                        {
+                            <text>
+                            scales: {
+                                x: { stacked: true },
+                                y: { stacked: true, beginAtZero: true }
+                            },
+                            </text>
+                        }
+                        else
+                        {
+                            <text>
+                            scales: {
+                                y: { beginAtZero: true }
+                            },
+                            </text>
+                        }
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        var label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if ('@Model.ChartData.SecondaryTitle'.includes('Completion')) {
+                                            label += context.parsed.y + '%';
+                                        } else {
+                                            label += context.parsed.y;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
+                        },
+                        onResize: function(chart, size) {
+                            console.log('Secondary chart resized:', size);
+                        }
+                    }
+                });
+            } else {
+                // Simple chart
+                var secondaryColors = secondaryData.map((d, i) => getDefaultColor(i));
+                secondaryChart = new Chart(secondaryCtx, {
+                    type: '@Model.ChartData.SecondaryChartType',
+                    data: {
+                        labels: secondaryData.map(d => d.label),
+                        datasets: [{
+                            label: '@Model.ChartData.SecondaryTitle',
+                            data: secondaryData.map(d => d.value),
+                            backgroundColor: secondaryColors,
+                            borderColor: secondaryColors,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                            duration: 300
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        var label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if ('@Model.ChartData.SecondaryTitle'.includes('Completion')) {
+                                            label += context.parsed + '%';
+                                        } else {
+                                            label += context.parsed;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        onResize: function(chart, size) {
+                            console.log('Simple secondary chart resized:', size);
+                        }
+                    }
+                });
+            }
+            </text>
+        }
+
+        // Navigation functions
+        function goToPage(page) {
+            const form = document.getElementById('filtersForm');
+            const pageInput = document.createElement('input');
+            pageInput.type = 'hidden';
+            pageInput.name = 'page';
+            pageInput.value = page;
+            form.appendChild(pageInput);
+            form.submit();
+        }
+
+        function sortBy(column) {
+            const form = document.getElementById('filtersForm');
+            const sortInput = document.createElement('input');
+            sortInput.type = 'hidden';
+            sortInput.name = 'sortBy';
+            sortInput.value = column;
+            
+            const currentSort = '@Model.Filters.SortBy';
+            const currentDesc = @Model.Filters.SortDescending.ToString().ToLower();
+            
+            let descending = false;
+            if (currentSort === column && !currentDesc) {
+                descending = true;
+            }
+            
+            const descInput = document.createElement('input');
+            descInput.type = 'hidden';
+            descInput.name = 'sortDescending';
+            descInput.value = descending;
+            
+            form.appendChild(sortInput);
+            form.appendChild(descInput);
+            form.submit();
+        }
+
+        function changePageSize(size) {
+            const form = document.getElementById('filtersForm');
+            const sizeInput = document.createElement('input');
+            sizeInput.type = 'hidden';
+            sizeInput.name = 'pageSize';
+            sizeInput.value = size;
+            form.appendChild(sizeInput);
+            form.submit();
+        }
+
+        function clearFilters() {
+            window.location.href = '@Url.Action("FlexibleAnalytics")';
+        }
+
+        function resetToDefaults() {
+            // Clear all form inputs
+            document.querySelectorAll('#filtersForm select').forEach(select => {
+                select.selectedIndex = -1;
+            });
+            document.querySelector('input[name="searchTerm"]').value = '';
+        }
+
+        function exportData() {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '@Url.Action("ExportFlexibleAnalytics")';
+            
+            // Copy current filter values
+            const filters = {
+                years: @Html.Raw(Json.Serialize(Model.Filters.Years)),
+                sections: @Html.Raw(Json.Serialize(Model.Filters.Sections)),
+                questionIds: @Html.Raw(Json.Serialize(Model.Filters.QuestionIds)),
+                companyIds: @Html.Raw(Json.Serialize(Model.Filters.CompanyIds)),
+                sectors: @Html.Raw(Json.Serialize(Model.Filters.Sectors)),
+                searchTerm: '@Model.Filters.SearchTerm',
+                sortBy: '@Model.Filters.SortBy',
+                sortDescending: @Model.Filters.SortDescending.ToString().ToLower()
+            };
+
+            Object.keys(filters).forEach(key => {
+                if (Array.isArray(filters[key])) {
+                    filters[key].forEach(value => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = value;
+                        form.appendChild(input);
+                    });
+                } else if (filters[key]) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = filters[key];
+                    form.appendChild(input);
+                }
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+
+        // Chart update functions
+        async function updateChart(chartType, attributeValue) {
+            const chartContainer = document.getElementById(chartType + 'Chart').parentElement;
+            const originalChart = document.getElementById(chartType + 'Chart');
+            
+            try {
+                console.log(`Updating ${chartType} chart with attribute: ${attributeValue}`);
+                
+                // Show loading state
+                const loadingElement = document.createElement('div');
+                loadingElement.className = 'text-center py-3';
+                loadingElement.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating chart...';
+                
+                chartContainer.appendChild(loadingElement);
+                originalChart.style.display = 'none';
+
+                // Get current filter values
+                const currentFilters = {
+                    years: @Html.Raw(Json.Serialize(Model.Filters.Years)),
+                    sections: @Html.Raw(Json.Serialize(Model.Filters.Sections)),
+                    questionIds: @Html.Raw(Json.Serialize(Model.Filters.QuestionIds)),
+                    companyIds: @Html.Raw(Json.Serialize(Model.Filters.CompanyIds)),
+                    sectors: @Html.Raw(Json.Serialize(Model.Filters.Sectors)),
+                    searchTerm: '@Model.Filters.SearchTerm',
+                    selectedAttribute: attributeValue,
+                    aggregationMethod: '@Model.Filters.AggregationMethod' // Added aggregation method
+                };
+
+                // Build query string
+                const queryParams = new URLSearchParams();
+                currentFilters.years.forEach(year => queryParams.append('years', year));
+                currentFilters.sections.forEach(section => queryParams.append('sections', section));
+                currentFilters.questionIds.forEach(id => queryParams.append('questionIds', id));
+                currentFilters.companyIds.forEach(id => queryParams.append('companyIds', id));
+                currentFilters.sectors.forEach(sector => queryParams.append('sectors', sector));
+                if (currentFilters.searchTerm) queryParams.append('searchTerm', currentFilters.searchTerm);
+                queryParams.append('selectedAttribute', attributeValue);
+                queryParams.append('aggregationMethod', currentFilters.aggregationMethod); // Append aggregation method
+
+                // Fetch new chart data
+                const url = `@Url.Action("GetChartData")?${queryParams.toString()}`;
+                console.log('API URL:', url);
+                
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                console.log('API Response:', result);
+
+                if (result.success) {
+                    // Update chart title
+                    const titleElement = chartContainer.previousElementSibling.querySelector('.card-title');
+                    if (chartType === 'primary') {
+                        titleElement.innerHTML = '<i class="fas fa-chart-pie text-primary me-2"></i>' + result.chartData.primaryTitle;
+                    } else {
+                        titleElement.innerHTML = '<i class="fas fa-chart-bar text-success me-2"></i>' + result.chartData.secondaryTitle;
+                        
+                        // Handle hiding/showing attribute filter for secondary chart
+                        const chartControls = chartContainer.previousElementSibling.querySelector('.chart-controls');
+                        if (result.chartData.secondaryHideAttributeFilter) {
+                            if (chartControls) {
+                                chartControls.style.display = 'none';
+                            }
+                        } else {
+                            if (chartControls) {
+                                chartControls.style.display = 'block';
+                            }
+                        }
+                    }
+
+                    // Update chart data
+                    if (chartType === 'primary' && primaryChart) {
+                        updateChartInstance(primaryChart, result.chartData.primaryData, result.chartData.primaryChartType);
+                    } else if (chartType === 'secondary' && secondaryChart) {
+                        updateChartInstance(secondaryChart, result.chartData.secondaryData, result.chartData.secondaryChartType, result.chartData.secondaryIsStacked);
+                    }
+                    
+                    // Ensure proper resize after data update
+                    setTimeout(() => {
+                        if (chartType === 'primary' && primaryChart) {
+                            primaryChart.resize();
+                            primaryChart.update('none'); // Update without animation for resize
+                        } else if (chartType === 'secondary' && secondaryChart) {
+                            secondaryChart.resize();
+                            secondaryChart.update('none'); // Update without animation for resize
+                        }
+                    }, 200);
+                } else {
+                    console.error('Failed to update chart:', result.error);
+                }
+
+                // Remove loading state
+                const loadingElements = chartContainer.querySelectorAll('.text-center');
+                loadingElements.forEach(el => chartContainer.removeChild(el));
+                originalChart.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error updating chart:', error);
+                // Remove loading state on error
+                const loadingElements = chartContainer.querySelectorAll('.text-center');
+                loadingElements.forEach(el => chartContainer.removeChild(el));
+                originalChart.style.display = 'block';
+            }
+        }
+
+        function updateAggregationMethod(method) {
+            console.log('Updating aggregation method to:', method);
+            
+            // Build a new URL from scratch to avoid parameter conflicts
+            const currentUrl = new URL(window.location.origin + window.location.pathname);
+            
+            // Clear all existing parameters and rebuild from current model state
+            currentUrl.searchParams.set('aggregationMethod', method);
+            
+            // Add all current filter parameters
+            @foreach (var year in Model.Filters.Years) {
+                <text>currentUrl.searchParams.append('years', '@year');</text>
+            }
+            @foreach (var section in Model.Filters.Sections) {
+                <text>currentUrl.searchParams.append('sections', '@Html.Raw(System.Web.HttpUtility.UrlEncode(section))');</text>
+            }
+            @foreach (var questionId in Model.Filters.QuestionIds) {
+                <text>currentUrl.searchParams.append('questionIds', '@questionId');</text>
+            }
+            @foreach (var companyId in Model.Filters.CompanyIds) {
+                <text>currentUrl.searchParams.append('companyIds', '@companyId');</text>
+            }
+            @foreach (var sector in Model.Filters.Sectors) {
+                <text>currentUrl.searchParams.append('sectors', '@Html.Raw(System.Web.HttpUtility.UrlEncode(sector))');</text>
+            }
+            @if (!string.IsNullOrEmpty(Model.Filters.SearchTerm)) {
+                <text>currentUrl.searchParams.set('searchTerm', '@Html.Raw(System.Web.HttpUtility.UrlEncode(Model.Filters.SearchTerm))');</text>
+            }
+            
+            // Preserve the current selectedAttribute - this is crucial
+            currentUrl.searchParams.set('selectedAttribute', '@Html.Raw(System.Web.HttpUtility.UrlEncode(Model.Filters.SelectedAttribute))');
+            
+            // Preserve pagination and sorting
+            currentUrl.searchParams.set('page', '@Model.Filters.Page');
+            currentUrl.searchParams.set('pageSize', '@Model.Filters.PageSize');
+            currentUrl.searchParams.set('sortBy', '@Html.Raw(System.Web.HttpUtility.UrlEncode(Model.Filters.SortBy))');
+            currentUrl.searchParams.set('sortDescending', '@Model.Filters.SortDescending.ToString().ToLower()');
+            
+            console.log('Current selectedAttribute:', '@Model.Filters.SelectedAttribute');
+            console.log('Redirecting to:', currentUrl.toString());
+            
+            // Redirect to the updated URL
+            window.location.href = currentUrl.toString();
+        }
+
+        function updateTimeSeriesGroupBy(value) {
+            // Find the hidden input and update its value
+            $('#timeSeriesGroupBy').val(value);
+
+            // If we are now grouping by company and there is a sector filter active,
+            // we should clear any selected companies to avoid conflicting filters
+            // that could result in no data.
+            if (value === 'Companies' && $('#sectorsFilter').val() && $('#sectorsFilter').val().length > 0) {
+                // Clear the Select2-enhanced companies filter
+                $('#companiesFilter').val(null).trigger('change');
+            }
+            
+            // This is a significant change, so we should refetch chart data
+            updateCharts();
+        }
+
+        function updateBarChartGroupBy(value) {
+            $('#barChartGroupBy').val(value);
+            updateCharts();
+        }
+
+        function getFilters() {
+            return {
+                years: $('#yearsFilter').val(),
+                sections: $('#sectionsFilter').val(),
+                questionIds: $('#questionsFilter').val(),
+                companyIds: $('#companiesFilter').val(),
+                sectors: $('#sectorsFilter').val(),
+                searchTerm: $('#tableSearch').val(),
+                selectedAttribute: '@Model.Filters.SelectedAttribute',
+                aggregationMethod: $('#aggregationMethod').val(),
+                barChartGroupBy: $('#barChartGroupBy').val(),
+                timeSeriesGroupBy: $('#timeSeriesGroupBy').val(),
+                page: 1, // Reset to first page for AJAX updates
+                pageSize: $('#pageSizeSelector').val() || 50
+            };
+        }
+
+        function updateCharts() {
+            const filters = getFilters();
+            console.log("Updating charts with filters:", filters);
+
+            // Show loading spinner for charts and table
+            $('#chartContainer, #dataTableContainer').html('<div class="d-flex justify-content-center align-items-center" style="height: 300px;"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>');
+            
+            $.ajax({
+                url: '@Url.Action("GetChartData")',
+                type: 'GET',
+                data: filters,
+                traditional: true, // Needed for array serialization
+                success: function (result) {
+                    if(result.success) {
+                        // Re-render charts
+                        $('#chartContainer').replaceWith(result.chartHtml);
+                        initializeCharts(result.chartData);
+
+                        // Re-render data table
+                        $('#dataTableContainer').replaceWith(result.tableHtml);
+                    } else {
+                         $('#chartContainer').html('<div class="alert alert-danger">Error loading chart data: ' + result.error + '</div>');
+                         $('#dataTableContainer').html('');
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error updating charts:", error);
+                    $('#chartContainer').html('<div class="alert alert-danger">An unexpected error occurred while loading chart data.</div>');
+                    $('#dataTableContainer').html('');
+                }
+            });
+        }
+
+        function updateChartInstance(chart, newData, chartType, isStacked = false) {
+            console.log('Updating chart instance with data:', newData);
+            console.log('Chart type:', chartType, 'Is stacked:', isStacked);
+            
+            // Handle different chart data structures
+            if (isStacked || newData.some(d => d.category || d.Category)) {
+                // Stacked or multi-series chart
+                updateStackedChart(chart, newData, isStacked);
+            } else {
+                // Simple chart
+                updateSimpleChart(chart, newData);
+            }
+
+            // Update chart type if needed
+            if (chart.config.type !== chartType) {
+                chart.config.type = chartType;
+            }
+
+            // Update stacking if needed
+            if (chart.options.scales) {
+                if (isStacked) {
+                    chart.options.scales.x.stacked = true;
+                    chart.options.scales.y.stacked = true;
+                } else {
+                    chart.options.scales.x.stacked = false;
+                    chart.options.scales.y.stacked = false;
+                }
+            }
+
+            // Force chart to resize and re-render properly
+            chart.resize();
+            chart.update('active');
+            
+            // Additional resize after a short delay to ensure proper rendering
+            setTimeout(() => {
+                chart.resize();
+            }, 100);
+            
+            console.log('Chart updated and resized successfully');
+        }
+
+        function updateSimpleChart(chart, newData) {
+            chart.data.labels = newData.map(d => d.label || d.Label);
+            chart.data.datasets[0].data = newData.map(d => d.value || d.Value);
+            
+            // Update colors
+            const colors = newData.map((d, i) => d.color || d.Color || getDefaultColor(i));
+            chart.data.datasets[0].backgroundColor = colors;
+            
+            console.log('Simple chart updated - Labels:', chart.data.labels);
+            console.log('Simple chart updated - Data:', chart.data.datasets[0].data);
+        }
+
+        function updateStackedChart(chart, newData, isStacked) {
+            // Group data by category for stacked charts (handle both case variations)
+            const categories = [...new Set(newData.map(d => d.category || d.Category).filter(c => c))];
+            const chartType = chart.config.type;
+            if (categories.length > 0) {
+                // Multi-series data
+                const labels = [...new Set(newData.map(d => d.label || d.Label))];
+                chart.data.labels = labels;
+                chart.data.datasets = categories.map((category, index) => {
+                    const categoryData = newData.filter(d => (d.category || d.Category) === category);
+                    return {
+                        label: category,
+                        data: labels.map(label => {
+                            const item = categoryData.find(d => (d.label || d.Label) === label);
+                            return item ? (item.value || item.Value) : 0;
+                        }),
+                        backgroundColor: chartType === 'line' ? getDefaultColor(index) : getDefaultColor(index),
+                        borderColor: getDefaultColor(index),
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        hidden: false
+                    };
+                });
+                if (chartType === 'line') {
+                    chart.options.scales.x.stacked = false;
+                    chart.options.scales.y.stacked = false;
+                } else if (isStacked) {
+                    chart.options.scales.x.stacked = true;
+                    chart.options.scales.y.stacked = true;
+                } else {
+                    chart.options.scales.x.stacked = false;
+                    chart.options.scales.y.stacked = false;
+                }
+                chart.update('active');
+                console.log('Stacked/multi-series chart updated - Labels:', chart.data.labels);
+                console.log('Stacked/multi-series chart updated - Categories:', categories);
+                console.log('Stacked/multi-series chart updated - Datasets:', chart.data.datasets.length);
+            } else {
+                // Fallback to simple chart
+                updateSimpleChart(chart, newData);
+            }
+        }
+
+        // Initialize multi-select dropdowns
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add some basic styling for multi-select
+            document.querySelectorAll('select[multiple]').forEach(select => {
+                select.style.height = '120px';
+            });
+            
+            // Add Enter key support for search
+            const searchInput = document.querySelector('input[name="searchTerm"]');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('filtersForm').submit();
+                    }
+                });
+            }
+            
+            // Add Enter key support for table search
+            const tableSearchInput = document.getElementById('tableSearch');
+            if (tableSearchInput) {
+                tableSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchTable();
+                    }
+                });
+            }
+            
+            // Add window resize handler for charts
+            window.addEventListener('resize', function() {
+                if (primaryChart) {
+                    primaryChart.resize();
+                }
+                if (secondaryChart) {
+                    secondaryChart.resize();
+                }
+            });
+        });
+
+        function searchTable() {
+            const searchTerm = document.getElementById('tableSearch').value;
+            
+            // Build URL with search term
+            const currentUrl = new URL(window.location.origin + window.location.pathname);
+            
+            // Add all current filter parameters
+            @foreach (var year in Model.Filters.Years) {
+                <text>currentUrl.searchParams.append('years', '@year');</text>
+            }
+            @foreach (var section in Model.Filters.Sections) {
+                <text>currentUrl.searchParams.append('sections', '@Html.Raw(System.Web.HttpUtility.UrlEncode(section))');</text>
+            }
+            @foreach (var questionId in Model.Filters.QuestionIds) {
+                <text>currentUrl.searchParams.append('questionIds', '@questionId');</text>
+            }
+            @foreach (var companyId in Model.Filters.CompanyIds) {
+                <text>currentUrl.searchParams.append('companyIds', '@companyId');</text>
+            }
+            @foreach (var sector in Model.Filters.Sectors) {
+                <text>currentUrl.searchParams.append('sectors', '@Html.Raw(System.Web.HttpUtility.UrlEncode(sector))');</text>
+            }
+            
+            // Add search term
+            if (searchTerm.trim()) {
+                currentUrl.searchParams.set('searchTerm', searchTerm);
+            }
+            
+            // Preserve other parameters
+            currentUrl.searchParams.set('selectedAttribute', '@Html.Raw(System.Web.HttpUtility.UrlEncode(Model.Filters.SelectedAttribute))');
+            currentUrl.searchParams.set('aggregationMethod', '@Html.Raw(System.Web.HttpUtility.UrlEncode(Model.Filters.AggregationMethod.ToString()))');
+            currentUrl.searchParams.set('page', '1'); // Reset to first page when searching
+            currentUrl.searchParams.set('pageSize', '@Model.Filters.PageSize');
+            currentUrl.searchParams.set('sortBy', '@Html.Raw(System.Web.HttpUtility.UrlEncode(Model.Filters.SortBy))');
+            currentUrl.searchParams.set('sortDescending', '@Model.Filters.SortDescending.ToString().ToLower()');
+            
+            // Navigate to the new URL
+            window.location.href = currentUrl.toString();
+        }
+    </script>
+}
+
+@functions {
+    private string GetDefaultColor(int index)
+    {
+        var colors = new[] {
+            "#0d6efd", "#20c997", "#fd7e14", "#6f42c1", "#dc3545",
+            "#198754", "#0dcaf0", "#f8d7da", "#d1ecf1", "#d4edda"
+        };
+        return colors[index % colors.Length];
+    }
+} 

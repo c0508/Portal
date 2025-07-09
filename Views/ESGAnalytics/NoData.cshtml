@@ -1,0 +1,55 @@
+@{
+    ViewData["Title"] = "ESG Analytics - No Data Available";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-chart-line text-muted display-1"></i>
+                </div>
+                
+                <h2 class="text-muted mb-3">No ESG Data Available</h2>
+                
+                <p class="lead text-muted mb-4">
+                    @if (!string.IsNullOrEmpty(ViewBag.NoDataMessage))
+                    {
+                        @ViewBag.NoDataMessage
+                    }
+                    else
+                    {
+                        @:We couldn't find any ESG analytics data for your organization.
+                    }
+                </p>
+
+                <div class="d-flex justify-content-center gap-3 flex-wrap">
+                    @if (User.IsInRole("PlatformAdmin") || User.IsInRole("OrgAdmin") || User.IsInRole("CampaignManager"))
+                    {
+                        <a asp-controller="Campaign" asp-action="Index" class="btn btn-primary">
+                            <i class="fas fa-megaphone me-2"></i>
+                            View Campaigns
+                        </a>
+                        
+                        <a asp-controller="Campaign" asp-action="Create" class="btn btn-outline-primary">
+                            <i class="fas fa-plus me-2"></i>
+                            Create New Campaign
+                        </a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Response" asp-action="Index" class="btn btn-primary">
+                            <i class="fas fa-clipboard-check me-2"></i>
+                            View My Assignments
+                        </a>
+                    }
+                    
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-2"></i>
+                        Return to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

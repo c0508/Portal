@@ -79,6 +79,8 @@ builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IConditionalQuestionService, ConditionalQuestionService>();
 builder.Services.AddScoped<IAnswerPrePopulationService, AnswerPrePopulationService>();
 builder.Services.AddScoped<IResponseWorkflowService, ResponseWorkflowService>();
+builder.Services.AddScoped<IESGAnalyticsService, ESGAnalyticsService>();
+builder.Services.AddScoped<IFlexibleAnalyticsService, FlexibleAnalyticsService>();
 
 // Configure authorization policies
 builder.Services.AddAuthorization(options =>

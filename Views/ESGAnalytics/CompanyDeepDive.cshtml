@@ -1,0 +1,298 @@
+@model ESGPlatform.Models.ViewModels.ESGCompanyDeepDiveViewModel
+
+@{
+    ViewData["Title"] = "Company Deep Dive - ESG Analytics";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="text-primary mb-1">@Model.CompanyName ESG Deep Dive</h2>
+                    <p class="text-muted mb-0">Comprehensive ESG performance analysis and peer comparison</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <select class="form-select" id="yearFilter" style="width: auto;">
+                        @if (ViewBag.AvailableYears != null)
+                        {
+                            @foreach (int year in ViewBag.AvailableYears)
+                            {
+                                if (year == ViewBag.SelectedYear)
+                                {
+                                    <option value="@year" selected>@year</option>
+                                }
+                                else
+                                {
+                                    <option value="@year">@year</option>
+                                }
+                            }
+                        }
+                    </select>
+                    <a href="@Url.Action("Portfolio", "ESGAnalytics")" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Portfolio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Company Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">@Model.ESGScore.ToString("F1")</h3>
+                    <p class="mb-0">ESG Score</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">@Model.Sector</h3>
+                    <p class="mb-0">Sector</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">@Model.PeerRanking</h3>
+                    <p class="mb-0">Peer Ranking</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body text-center">
+                    <h3 class="mb-1">@Model.PortfolioRanking</h3>
+                    <p class="mb-0">Portfolio Ranking</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <!-- Historical Trends -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Historical ESG Trends</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="historicalTrendsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Peer Comparison -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Peer Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="peerComparisonChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strengths and Gaps -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0">ESG Strengths</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.StrengthsAndGaps?.Strengths?.Any() == true)
+                    {
+                        <ul class="list-unstyled">
+                            @foreach (var strength in Model.StrengthsAndGaps.Strengths)
+                            {
+                                <li class="mb-2">
+                                    <i class="fas fa-check-circle text-success me-2"></i>
+                                    @strength.Area: @strength.Description
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No specific strengths identified.</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="card-title mb-0">Improvement Areas</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.StrengthsAndGaps?.Gaps?.Any() == true)
+                    {
+                        <ul class="list-unstyled">
+                            @foreach (var gap in Model.StrengthsAndGaps.Gaps)
+                            {
+                                <li class="mb-2">
+                                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                    @gap.Area: @gap.Description
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No specific improvement areas identified.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Responses -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Detailed ESG Responses</h5>
+                </div>
+                <div class="card-body">
+                    @if (Model.CompanyResponses?.Any() == true)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Section</th>
+                                        <th>Question</th>
+                                        <th>Type</th>
+                                        <th>Response</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var response in Model.CompanyResponses)
+                                    {
+                                        <tr>
+                                            <td><span class="badge bg-secondary">@(response.Section ?? "General")</span></td>
+                                            <td>@response.QuestionText</td>
+                                            <td>
+                                                @switch (response.QuestionType)
+                                                {
+                                                    case ESGPlatform.Models.Entities.QuestionType.YesNo:
+                                                        <span class="badge bg-info">Yes/No</span>
+                                                        break;
+                                                    case ESGPlatform.Models.Entities.QuestionType.Number:
+                                                        <span class="badge bg-success">Numeric</span>
+                                                        break;
+                                                    case ESGPlatform.Models.Entities.QuestionType.Text:
+                                                        <span class="badge bg-primary">Text</span>
+                                                        break;
+                                                    case ESGPlatform.Models.Entities.QuestionType.MultiSelect:
+                                                        <span class="badge bg-warning">Multiple Choice</span>
+                                                        break;
+                                                    default:
+                                                        <span class="badge bg-secondary">Other</span>
+                                                        break;
+                                                }
+                                            </td>
+                                            <td>@response.DisplayValue</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No detailed responses available.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Historical Trends Chart
+        const historicalCtx = document.getElementById('historicalTrendsChart').getContext('2d');
+        const historicalYears = @Html.Raw(Json.Serialize(Model.HistoricalTrends?.YearlyESGScores?.Keys?.ToList() ?? new List<int>()));
+        const historicalScores = @Html.Raw(Json.Serialize(Model.HistoricalTrends?.YearlyESGScores?.Values?.ToList() ?? new List<decimal>()));
+        
+        const historicalChart = new Chart(historicalCtx, {
+            type: 'line',
+            data: {
+                labels: historicalYears,
+                datasets: [{
+                    label: 'ESG Score',
+                    data: historicalScores,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Peer Comparison Chart
+        const peerCtx = document.getElementById('peerComparisonChart').getContext('2d');
+        const peerChart = new Chart(peerCtx, {
+            type: 'bar',
+            data: {
+                labels: ['This Company', 'Peer Average', 'Portfolio Average'],
+                datasets: [{
+                    label: 'ESG Score',
+                    data: [
+                        @Model.ESGScore,
+                        @(Model.PeerComparison?.PeerAverageESGScore ?? 0),
+                        @(Model.PortfolioComparison?.PortfolioAverageESGScore ?? 0)
+                    ],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.8)',
+                        'rgba(255, 206, 86, 0.8)', 
+                        'rgba(75, 192, 192, 0.8)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 206, 86, 1)',
+                        'rgba(75, 192, 192, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Year filter change handler
+        document.getElementById('yearFilter').addEventListener('change', function() {
+            const selectedYear = this.value;
+            const companyId = @Model.CompanyId;
+            window.location.href = `@Url.Action("CompanyDeepDive", "ESGAnalytics")?companyId=${companyId}&year=${selectedYear}`;
+        });
+    </script>
+} 

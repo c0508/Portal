@@ -1,0 +1,382 @@
+@model ESGPlatform.Models.ViewModels.PortfolioOverviewViewModel
+@{
+    ViewData["Title"] = "Portfolio ESG Overview";
+}
+
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="display-6 fw-bold text-primary">Portfolio ESG Overview</h1>
+                    <p class="text-muted mb-0">Comprehensive ESG performance analysis across portfolio companies</p>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-calendar-alt me-2"></i>Reporting Period
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="?year=2024">2024</a></li>
+                        <li><a class="dropdown-item" href="?year=2023">2023</a></li>
+                        <li><a class="dropdown-item" href="?year=2022">2022</a></li>
+                        <li><a class="dropdown-item" href="?year=2021">2021</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Performance Indicators -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-gradient-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3 class="fw-bold mb-0">@Model.OverallESGScore.ToString("F1")</h3>
+                            <p class="mb-0 opacity-75">Overall ESG Score</p>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                    @if (Model.ESGScoreChange != 0)
+                    {
+                        <div class="mt-2">
+                            <span class="badge bg-white text-primary">
+                                <i class="fas fa-arrow-@(Model.ESGScoreChange > 0 ? "up" : "down")"></i>
+                                @Math.Abs(Model.ESGScoreChange).ToString("F1") YoY
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-gradient-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3 class="fw-bold mb-0">@Model.ClimatePolicyAdoption.ToString("P0")</h3>
+                            <p class="mb-0 opacity-75">Climate Policy Adoption</p>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-leaf"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="opacity-75">@Model.CompaniesWithClimatePolicy of @Model.TotalCompanies companies</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-gradient-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3 class="fw-bold mb-0">@Model.AverageWomenLeadership.ToString("F1")%</h3>
+                            <p class="mb-0 opacity-75">Women in Leadership</p>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <span class="badge bg-white text-info">
+                            <i class="fas fa-arrow-up"></i>
+                            +@(Model.WomenLeadershipImprovement.ToString("F1"))% YoY
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-gradient-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h3 class="fw-bold mb-0">@Model.TotalEmissionsReduction.ToString("F1")%</h3>
+                            <p class="mb-0 opacity-75">Emissions Reduction</p>
+                        </div>
+                        <div class="fs-1 opacity-50">
+                            <i class="fas fa-cloud"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="opacity-75">vs 2021 baseline</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Content -->
+    <div class="row">
+        <!-- ESG Score Trends -->
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-line text-primary me-2"></i>
+                        Portfolio ESG Performance Trends
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="esgTrendsChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top/Bottom Performers -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-trophy text-warning me-2"></i>
+                        ESG Leaders & Laggards
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-success mb-3">Top Performers</h6>
+                    @foreach (var performer in Model.TopPerformers.Take(3))
+                    {
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <div class="fw-bold">@performer.CompanyName</div>
+                                <small class="text-muted">@performer.Sector</small>
+                            </div>
+                            <span class="badge bg-success">@performer.ESGScore.ToString("F1")</span>
+                        </div>
+                    }
+                    
+                    <hr class="my-3">
+                    
+                    <h6 class="text-warning mb-3">Improvement Opportunities</h6>
+                    @foreach (var performer in Model.BottomPerformers.Take(3))
+                    {
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <div class="fw-bold">@performer.CompanyName</div>
+                                <small class="text-muted">@performer.Sector</small>
+                            </div>
+                            <span class="badge bg-warning">@performer.ESGScore.ToString("F1")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sector Performance & Policy Adoption -->
+    <div class="row">
+        <!-- Sector Performance Comparison -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-industry text-primary me-2"></i>
+                        Performance by Sector
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="sectorChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Policy Adoption Rates -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-clipboard-check text-success me-2"></i>
+                        Policy Adoption Rates
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @foreach (var policy in Model.PolicyAdoptionRates)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="fw-medium">@policy.PolicyName</span>
+                                <span class="text-muted">@policy.AdoptionRate.ToString("P0")</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar @GetProgressBarClass(policy.AdoptionRate)" 
+                                     style="width: @(policy.AdoptionRate * 100)%">
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Company Performance Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table text-primary me-2"></i>
+                        Detailed Company Performance
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Sector</th>
+                                    <th>ESG Score</th>
+                                    <th>Climate Policy</th>
+                                    <th>D&I Policy</th>
+                                    <th>Women Leadership</th>
+                                    <th>Emissions (tCO2e)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var company in Model.CompanyPerformances)
+                                {
+                                    <tr>
+                                        <td class="fw-medium">@company.CompanyName</td>
+                                        <td>
+                                            <span class="badge bg-light text-dark">@company.Sector</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetESGScoreBadgeClass(company.ESGScore)">
+                                                @company.ESGScore.ToString("F1")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (company.HasClimatePolicy)
+                                            {
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (company.HasDiversityPolicy)
+                                            {
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="fas fa-times-circle text-danger"></i>
+                                            }
+                                        </td>
+                                        <td>@company.WomenLeadershipPercentage.ToString("F1")%</td>
+                                        <td>@company.TotalEmissions.ToString("N0")</td>
+                                        <td>
+                                            <a href="@Url.Action("CompanyDeepDive", new { companyId = company.CompanyId })" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-chart-pie me-1"></i>Details
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // ESG Trends Chart
+        const esgTrendsCtx = document.getElementById('esgTrendsChart').getContext('2d');
+        new Chart(esgTrendsCtx, {
+            type: 'line',
+            data: {
+                labels: @Html.Raw(Json.Serialize(Model.TrendData.Select(t => t.Year))),
+                datasets: [{
+                    label: 'Portfolio ESG Score',
+                    data: @Html.Raw(Json.Serialize(Model.TrendData.Select(t => t.AverageESGScore))),
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // Sector Performance Chart
+        const sectorCtx = document.getElementById('sectorChart').getContext('2d');
+        new Chart(sectorCtx, {
+            type: 'doughnut',
+            data: {
+                labels: @Html.Raw(Json.Serialize(Model.SectorPerformances.Select(s => s.Sector))),
+                datasets: [{
+                    data: @Html.Raw(Json.Serialize(Model.SectorPerformances.Select(s => s.AverageESGScore))),
+                    backgroundColor: [
+                        '#0d6efd',
+                        '#20c997',
+                        '#fd7e14',
+                        '#6f42c1',
+                        '#dc3545'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    </script>
+}
+
+@functions {
+    private string GetProgressBarClass(decimal adoptionRate)
+    {
+        return adoptionRate switch
+        {
+            >= 0.8m => "bg-success",
+            >= 0.6m => "bg-info",
+            >= 0.4m => "bg-warning",
+            _ => "bg-danger"
+        };
+    }
+
+    private string GetESGScoreBadgeClass(decimal esgScore)
+    {
+        return esgScore switch
+        {
+            >= 75 => "bg-success",
+            >= 60 => "bg-info", 
+            >= 45 => "bg-warning",
+            _ => "bg-danger"
+        };
+    }
+} 

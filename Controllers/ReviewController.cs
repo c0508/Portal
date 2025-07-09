@@ -68,6 +68,11 @@ public class ReviewController : BaseController
             return Forbid();
         }
 
+        if (CurrentUserId == null)
+        {
+            return Forbid();
+        }
+
         try
         {
             await _reviewService.AssignQuestionReviewerAsync(
@@ -103,6 +108,11 @@ public class ReviewController : BaseController
         if (assignment == null) return NotFound();
 
         if (assignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
+        {
+            return Forbid();
+        }
+
+        if (CurrentUserId == null)
         {
             return Forbid();
         }
@@ -143,6 +153,11 @@ public class ReviewController : BaseController
         if (assignment == null) return NotFound();
 
         if (assignment.LeadResponderId != CurrentUserId && !IsPlatformAdmin)
+        {
+            return Forbid();
+        }
+
+        if (CurrentUserId == null)
         {
             return Forbid();
         }
@@ -222,6 +237,11 @@ public class ReviewController : BaseController
     [Authorize(Policy = "Reviewer")]
     public async Task<IActionResult> MyReviews()
     {
+        if (CurrentUserId == null)
+        {
+            return Forbid();
+        }
+
         var reviewAssignments = await _reviewService.GetReviewAssignmentsForUserAsync(CurrentUserId);
         
         var model = reviewAssignments.Select(ra => new ReviewAssignmentViewModel
@@ -280,7 +300,7 @@ public class ReviewController : BaseController
             await _context.SaveChangesAsync();
         }
 
-        var model = await BuildReviewQuestionsViewModel(reviewAssignment);
+        var model = BuildReviewQuestionsViewModel(reviewAssignment);
         return View(model);
     }
 
@@ -586,7 +606,7 @@ public class ReviewController : BaseController
             );
     }
 
-    private async Task<ReviewQuestionsViewModel> BuildReviewQuestionsViewModel(ReviewAssignment reviewAssignment)
+    private ReviewQuestionsViewModel BuildReviewQuestionsViewModel(ReviewAssignment reviewAssignment)
     {
         var questions = new List<Question>();
         var responses = new List<Response>();

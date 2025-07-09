@@ -147,6 +147,12 @@
                                    class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Campaign" && ViewContext.RouteData.Values["Action"]?.ToString() != "Dashboard" ? "active" : "")">
                                     <i class="bi bi-megaphone me-2"></i> Campaigns
                                 </a>
+                                
+                                <!-- Analytics - for PlatformAdmin, OrgAdmin, and CampaignManager -->
+                                <a asp-controller="ESGAnalytics" asp-action="FlexibleAnalytics"
+                                   class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "ESGAnalytics" && ViewContext.RouteData.Values["Action"]?.ToString() == "FlexibleAnalytics" ? "active" : "")">
+                                    <i class="bi bi-graph-up me-2"></i> Analytics
+                                </a>
                             }
                             
                             @* Show Delegations to LeadResponders and higher roles *@

@@ -48,7 +48,7 @@ public class OrganizationController : BaseController
     }
 
     // GET: /Organization/Create
-    public async Task<IActionResult> Create()
+    public IActionResult Create()
     {
         var model = new OrganizationViewModel();
         // await PopulateMasterDataDropdowns(model); // Temporarily disabled - will be replaced with relationship-specific attribute system
