@@ -346,6 +346,7 @@ public class ReviewService
         };
 
         _context.ReviewAuditLogs.Add(auditLog);
+        await _context.SaveChangesAsync();
     }
 
     /// <summary>

@@ -77,6 +77,10 @@ public class QuestionAssignmentController : BaseController
                 return RedirectToAction(nameof(Manage), new { id = campaignAssignmentId });
             }
 
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
             await _assignmentService.CreateQuestionAssignmentAsync(campaignAssignmentId, questionId, assignedUserId, CurrentUserId, instructions);
 
             TempData["Success"] = "Question assigned successfully.";
@@ -109,6 +113,10 @@ public class QuestionAssignmentController : BaseController
                 return RedirectToAction(nameof(Manage), new { id = campaignAssignmentId });
             }
 
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
             await _assignmentService.CreateSectionAssignmentAsync(campaignAssignmentId, sectionName, assignedUserId, CurrentUserId, instructions);
 
             TempData["Success"] = "Section assigned successfully.";
@@ -134,6 +142,10 @@ public class QuestionAssignmentController : BaseController
                 return Forbid();
             }
 
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
             var success = await _assignmentService.DeleteAssignmentAsync(assignmentId, CurrentUserId);
             if (success)
             {
@@ -168,6 +180,10 @@ public class QuestionAssignmentController : BaseController
 
             if (model.AssignmentType == "Questions" && model.SelectedQuestionIds?.Any() == true)
             {
+                if (CurrentUserId == null)
+                {
+                    return Forbid();
+                }
                 await _assignmentService.CreateBulkAssignmentsAsync(
                     model.CampaignAssignmentId, 
                     model.SelectedQuestionIds, 
@@ -183,6 +199,10 @@ public class QuestionAssignmentController : BaseController
                 {
                     if (!await _assignmentService.IsSectionAssignedAsync(sectionName, model.CampaignAssignmentId))
                     {
+                        if (CurrentUserId == null)
+                        {
+                            return Forbid();
+                        }
                         await _assignmentService.CreateSectionAssignmentAsync(
                             model.CampaignAssignmentId, 
                             sectionName, 
@@ -221,6 +241,10 @@ public class QuestionAssignmentController : BaseController
                 return Forbid();
             }
 
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
             var success = await _assignmentService.DeleteAssignmentAsync(id, CurrentUserId);
             if (success)
             {
@@ -303,6 +327,10 @@ public class QuestionAssignmentController : BaseController
         try
         {
             userId ??= CurrentUserId;
+            if (userId == null)
+            {
+                return Forbid();
+            }
             var assignedQuestionIds = await _assignmentService.GetAssignedQuestionIdsForUserAsync(userId, campaignAssignmentId);
             return Json(assignedQuestionIds);
         }

@@ -1,0 +1,284 @@
+@model ESGPlatform.Models.ViewModels.ExternalLoginConfirmationViewModel
+@{
+    Layout = null;
+    
+    // Get branding context for the default organization
+    var brandingService = Context.RequestServices.GetRequiredService<ESGPlatform.Services.IBrandingService>();
+    var brandingContext = await brandingService.GetDefaultBrandingAsync(1);
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirm Account - @brandingContext.OrganizationName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            @Html.Raw(brandingContext.ToCssVariables())
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+            color: #374151;
+        }
+
+        .login-container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            width: 100%;
+            max-width: 420px;
+            padding: 3rem 2rem;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .brand-section {
+            margin-bottom: 2rem;
+        }
+
+        .brand-logo {
+            width: 60px;
+            height: 60px;
+            background: var(--brand-primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: -0.025em;
+        }
+
+        .organization-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.025em;
+        }
+
+        .platform-subtitle {
+            font-size: 1rem;
+            color: #6B7280;
+            font-weight: 500;
+        }
+
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .form-subtitle {
+            font-size: 0.875rem;
+            color: #6B7280;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid #E5E7EB;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            background-color: #FAFAFA;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--brand-primary);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(var(--brand-primary-rgb), 0.1);
+        }
+
+        .btn-confirm {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--brand-primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 0.5rem;
+        }
+
+        .btn-confirm:hover {
+            background: var(--brand-secondary);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px -5px rgba(var(--brand-primary-rgb), 0.3);
+        }
+
+        .btn-confirm:active {
+            transform: translateY(0);
+        }
+
+        .validation-summary-errors {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #B91C1C;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .validation-summary-errors ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .validation-summary-errors li {
+            margin-bottom: 0.25rem;
+        }
+
+        .field-validation-error {
+            color: #DC2626;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            display: block;
+        }
+
+        .microsoft-info {
+            background: #F0F9FF;
+            border: 1px solid #BAE6FD;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+            color: #0369A1;
+        }
+
+        .microsoft-info i {
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="brand-section">
+                <div class="brand-logo">
+                    @if (!string.IsNullOrEmpty(brandingContext.LogoUrl))
+                    {
+                        <img src="@brandingContext.LogoUrl" alt="@brandingContext.OrganizationName" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" />
+                    }
+                    else
+                    {
+                        @brandingContext.OrganizationName.Substring(0, Math.Min(2, brandingContext.OrganizationName.Length))
+                    }
+                </div>
+                
+                <h1 class="organization-name">@brandingContext.OrganizationName</h1>
+                <p class="platform-subtitle">Double Materiality Assessment Platform</p>
+            </div>
+
+            <div class="login-form-section">
+                <h2 class="form-title">Confirm Your Account</h2>
+                <p class="form-subtitle">Please confirm your details to complete your account setup</p>
+                
+                <div class="microsoft-info">
+                    <i class="fas fa-info-circle"></i>
+                    You're signing in with your Microsoft account. Please verify your information below.
+                </div>
+                
+                <form asp-action="ExternalLoginConfirmation" method="post" id="confirmForm">
+                    <div asp-validation-summary="All" class="validation-summary-errors"></div>
+                    <input name="ReturnUrl" type="hidden" value="@ViewData["ReturnUrl"]" />
+                    
+                    <div class="form-group">
+                        <label asp-for="Email" class="form-label">Email</label>
+                        <input asp-for="Email" class="form-control" readonly />
+                        <span asp-validation-for="Email" class="field-validation-error"></span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label asp-for="FirstName" class="form-label">First Name</label>
+                        <input asp-for="FirstName" class="form-control" placeholder="Enter your first name" />
+                        <span asp-validation-for="FirstName" class="field-validation-error"></span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label asp-for="LastName" class="form-label">Last Name</label>
+                        <input asp-for="LastName" class="form-control" placeholder="Enter your last name" />
+                        <span asp-validation-for="LastName" class="field-validation-error"></span>
+                    </div>
+                    
+                    <button type="submit" class="btn-confirm" id="confirmBtn">
+                        Create Account
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+    
+    <script>
+        // Enhanced form submission with loading state
+        document.getElementById('confirmForm').addEventListener('submit', function() {
+            const submitBtn = document.getElementById('confirmBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+        });
+
+        // Auto-focus first name field on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const firstNameField = document.querySelector('input[name="FirstName"]');
+            if (firstNameField && !firstNameField.value) {
+                firstNameField.focus();
+            }
+        });
+    </script>
+</body>
+</html> 
