@@ -125,7 +125,7 @@ public class CampaignController : BaseController
             campaign = await campaignQuery.FirstOrDefaultAsync();
         }
 
-        if (campaign == null) return NotFound();
+        if (campaign == null || id == null) return NotFound();
 
         // Set campaign-specific branding context
         await SetBrandingContextAsync(campaignId: id.Value);
@@ -215,7 +215,7 @@ public class CampaignController : BaseController
             {
                 Name = model.Name,
                 Description = model.Description,
-                OrganizationId = CurrentOrganizationId ?? 1, // Use current org or fallback
+                OrganizationId = CurrentOrganizationId ?? 1, // Use current org or fallback (ensure 1 is a valid org ID)
                 Status = model.Status,
                 StartDate = model.StartDate,
                 EndDate = model.EndDate,

@@ -18,8 +18,9 @@ public class ResponseController : BaseController
     private readonly ILogger<ResponseController> _logger;
     private readonly IConditionalQuestionService _conditionalService;
     private readonly IResponseWorkflowService _responseWorkflowService;
+    private readonly IFileUploadService _fileUploadService;
 
-    public ResponseController(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment, IResponseChangeTrackingService changeTrackingService, ILogger<ResponseController> logger, IConditionalQuestionService conditionalService, IResponseWorkflowService responseWorkflowService)
+    public ResponseController(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment, IResponseChangeTrackingService changeTrackingService, ILogger<ResponseController> logger, IConditionalQuestionService conditionalService, IResponseWorkflowService responseWorkflowService, IFileUploadService fileUploadService)
     {
         _context = context;
         _webHostEnvironment = webHostEnvironment;
@@ -27,6 +28,7 @@ public class ResponseController : BaseController
         _logger = logger;
         _conditionalService = conditionalService;
         _responseWorkflowService = responseWorkflowService;
+        _fileUploadService = fileUploadService;
     }
 
     // GET: Response
@@ -172,6 +174,11 @@ public class ResponseController : BaseController
         if (assignment == null) return NotFound();
 
         // Check permissions and determine access type
+        if (CurrentUserId == null)
+        {
+            return Forbid();
+        }
+        
         bool isLeadResponder = assignment.LeadResponderId == CurrentUserId;
         bool isDelegatedUser = !isLeadResponder && await HasDelegationForAssignment(id.Value, CurrentUserId);
         bool hasQuestionAssignments = !isLeadResponder && !isDelegatedUser && await HasQuestionAssignmentForAssignment(id.Value, CurrentUserId);
@@ -218,26 +225,31 @@ public class ResponseController : BaseController
             var assignment = await GetAssignmentWithAccessCheckAsync(request.AssignmentId);
             if (assignment == null) return NotFound();
 
-                    // Check permissions
-        bool isLeadResponder = assignment.LeadResponderId == CurrentUserId;
-        bool isDelegatedUser = !isLeadResponder && await HasDelegationForAssignment(request.AssignmentId, CurrentUserId);
-        bool hasQuestionAssignment = !isLeadResponder && !isDelegatedUser && await HasQuestionAssignmentForAssignment(request.AssignmentId, CurrentUserId);
+            // Check permissions
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
+            
+            bool isLeadResponder = assignment.LeadResponderId == CurrentUserId;
+            bool isDelegatedUser = !isLeadResponder && await HasDelegationForAssignment(request.AssignmentId, CurrentUserId);
+            bool hasQuestionAssignment = !isLeadResponder && !isDelegatedUser && await HasQuestionAssignmentForAssignment(request.AssignmentId, CurrentUserId);
         
-        if (!isLeadResponder && !isDelegatedUser && !hasQuestionAssignment)
-        {
-            return Forbid();
-        }
+            if (!isLeadResponder && !isDelegatedUser && !hasQuestionAssignment)
+            {
+                return Forbid();
+            }
         
-        // Additional checks for restricted users
-        if (isDelegatedUser && !await HasDelegationForQuestion(request.AssignmentId, request.QuestionId, CurrentUserId))
-        {
-            return Forbid();
-        }
+            // Additional checks for restricted users
+            if (isDelegatedUser && !await HasDelegationForQuestion(request.AssignmentId, request.QuestionId, CurrentUserId))
+            {
+                return Forbid();
+            }
         
-        if (hasQuestionAssignment && !await HasQuestionAssignmentForQuestion(request.AssignmentId, request.QuestionId, CurrentUserId))
-        {
-            return Forbid();
-        }
+            if (hasQuestionAssignment && !await HasQuestionAssignmentForQuestion(request.AssignmentId, request.QuestionId, CurrentUserId))
+            {
+                return Forbid();
+            }
 
             // Get or create response
             var response = assignment.Responses
@@ -352,6 +364,11 @@ public class ResponseController : BaseController
             if (assignment == null) return NotFound();
 
             // Check permissions
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
+            
             bool isLeadResponder = assignment.LeadResponderId == CurrentUserId;
             bool isDelegatedUser = !isLeadResponder && await HasDelegationForAssignment(assignmentId, CurrentUserId);
             bool hasQuestionAssignment = !isLeadResponder && !isDelegatedUser && await HasQuestionAssignmentForAssignment(assignmentId, CurrentUserId);
@@ -521,6 +538,11 @@ public class ResponseController : BaseController
             if (assignment == null) return NotFound();
 
             // Check permissions - only lead responder can delegate
+            if (CurrentUserId == null)
+            {
+                return Forbid();
+            }
+            
             if (assignment.LeadResponderId != CurrentUserId)
             {
                 return Forbid();
@@ -562,6 +584,11 @@ public class ResponseController : BaseController
             if (assignment == null) return Json(new { success = false, message = "Assignment not found" });
 
             // Check permissions
+            if (CurrentUserId == null)
+            {
+                return Json(new { success = false, message = "Access denied" });
+            }
+            
             bool isLeadResponder = assignment.LeadResponderId == CurrentUserId;
             bool isDelegatedUser = !isLeadResponder && await HasDelegationForAssignment(assignmentId, CurrentUserId);
             bool hasQuestionAssignment = !isLeadResponder && !isDelegatedUser && await HasQuestionAssignmentForAssignment(assignmentId, CurrentUserId);
@@ -587,52 +614,38 @@ public class ResponseController : BaseController
                 return Json(new { success = false, message = "No file selected" });
             }
 
-            // Create uploads directory if it doesn't exist
-            var uploadsPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads");
-            if (!Directory.Exists(uploadsPath))
+            // Use secure file upload service
+            var uploadResult = await _fileUploadService.UploadFileAsync(file, CurrentUserId);
+            
+            if (!uploadResult.Success)
             {
-                Directory.CreateDirectory(uploadsPath);
-            }
-
-            // Generate unique filename
-            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
-            var filePath = Path.Combine(uploadsPath, fileName);
-
-            // Save file
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
+                return Json(new { success = false, message = uploadResult.Message });
             }
 
             // Get or create response
             var response = await GetOrCreateResponse(assignmentId, questionId);
 
-            // Create file upload record
-            var fileUpload = new FileUpload
+            // Update file upload record with response ID
+            var fileUpload = await _context.FileUploads.FindAsync(uploadResult.FileId);
+            if (fileUpload != null)
             {
-                ResponseId = response.Id,
-                FileName = file.FileName,
-                FilePath = $"/uploads/{fileName}",
-                FileSize = file.Length,
-                ContentType = file.ContentType,
-                UploadedAt = DateTime.UtcNow,
-                UploadedById = CurrentUserId!
-            };
-
-            _context.FileUploads.Add(fileUpload);
-            await _context.SaveChangesAsync();
+                fileUpload.ResponseId = response.Id;
+                await _context.SaveChangesAsync();
+            }
 
             return Json(new { 
                 success = true, 
                 message = "File uploaded successfully",
-                fileId = fileUpload.Id,
-                fileName = fileUpload.FileName,
-                filePath = fileUpload.FilePath
+                fileId = uploadResult.FileId,
+                fileName = uploadResult.FileName,
+                filePath = uploadResult.FilePath
             });
         }
         catch (Exception ex)
         {
-            return Json(new { success = false, message = "Error uploading file: " + ex.Message });
+            _logger.LogError(ex, "Error uploading file for assignment {AssignmentId}, question {QuestionId}, user {UserId}", 
+                assignmentId, questionId, CurrentUserId);
+            return Json(new { success = false, message = "Error uploading file" });
         }
     }
 
@@ -656,6 +669,11 @@ public class ResponseController : BaseController
                 return Json(new { success = false, message = "Access denied" });
 
             // Check permissions
+            if (CurrentUserId == null)
+            {
+                return Json(new { success = false, message = "Access denied" });
+            }
+            
             bool isLeadResponder = assignment.LeadResponderId == CurrentUserId;
             bool isDelegatedUser = !isLeadResponder && await HasDelegationForAssignment(assignment.Id, CurrentUserId);
             
@@ -670,23 +688,20 @@ public class ResponseController : BaseController
                 return Json(new { success = false, message = "Access denied" });
             }
 
-            // Delete physical file
-            var fileName = Path.GetFileName(fileUpload.FilePath);
-            var filePath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", fileName);
-            if (System.IO.File.Exists(filePath))
+            // Use secure file upload service for deletion
+            var deleteResult = await _fileUploadService.DeleteFileAsync(fileId, CurrentUserId);
+            
+            if (!deleteResult)
             {
-                System.IO.File.Delete(filePath);
+                return Json(new { success = false, message = "Error deleting file" });
             }
-
-            // Delete database record
-            _context.FileUploads.Remove(fileUpload);
-            await _context.SaveChangesAsync();
 
             return Json(new { success = true, message = "File deleted successfully" });
         }
         catch (Exception ex)
         {
-            return Json(new { success = false, message = "Error deleting file: " + ex.Message });
+            _logger.LogError(ex, "Error deleting file {FileId}, user {UserId}", fileId, CurrentUserId);
+            return Json(new { success = false, message = "Error deleting file" });
         }
     }
 
@@ -699,6 +714,11 @@ public class ResponseController : BaseController
         if (assignment == null) return NotFound();
 
         // Check permissions
+        if (CurrentUserId == null)
+        {
+            return Forbid();
+        }
+        
         if (assignment.LeadResponderId != CurrentUserId)
         {
             return Forbid();
@@ -717,6 +737,11 @@ public class ResponseController : BaseController
         if (assignment == null) return NotFound();
 
         // Check permissions
+        if (CurrentUserId == null)
+        {
+            return Forbid();
+        }
+        
         if (assignment.LeadResponderId != CurrentUserId)
         {
             return Forbid();
@@ -775,6 +800,11 @@ public class ResponseController : BaseController
     [HttpGet]
     public async Task<IActionResult> DebugQuestionAssignments(string? userId = null)
     {
+        if (userId == null && CurrentUserId == null)
+        {
+            return Json(new { success = false, message = "User ID required" });
+        }
+        
         userId = userId ?? CurrentUserId;
         
         var debug = new
@@ -1382,6 +1412,11 @@ public class ResponseController : BaseController
 
     private async Task<Response?> GetOrCreateResponse(int assignmentId, int questionId)
     {
+        if (CurrentUserId == null)
+        {
+            throw new InvalidOperationException("CurrentUserId is required to create a response");
+        }
+        
         var response = await _context.Responses
             .FirstOrDefaultAsync(r => r.CampaignAssignmentId == assignmentId && 
                                     r.QuestionId == questionId);
@@ -1392,7 +1427,7 @@ public class ResponseController : BaseController
             {
                 QuestionId = questionId,
                 CampaignAssignmentId = assignmentId,
-                ResponderId = CurrentUserId!,
+                ResponderId = CurrentUserId,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -1405,6 +1440,11 @@ public class ResponseController : BaseController
 
     private async Task LoadDelegateQuestionData(DelegateQuestionViewModel model)
     {
+        if (CurrentUserId == null)
+        {
+            throw new InvalidOperationException("CurrentUserId is required to load delegate question data");
+        }
+        
         var assignment = await _context.CampaignAssignments
             .Include(ca => ca.Campaign)
             .Include(ca => ca.QuestionnaireVersion)

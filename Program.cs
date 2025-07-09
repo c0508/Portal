@@ -9,6 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var sqlPassword = Environment.GetEnvironmentVariable("SQL_PASSWORD") ?? 
+                  builder.Configuration["ConnectionStrings:DefaultConnection:Password"];
+if (!string.IsNullOrEmpty(sqlPassword))
+{
+    connectionString = connectionString.Replace("${SQL_PASSWORD}", sqlPassword);
+}
 Console.WriteLine($"Connection String: {connectionString}");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -47,12 +53,6 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 // Add authentication providers (temporarily disabled for initial development)
 // builder.Services.AddAuthentication()
-//     .AddGoogle(options =>
-//     {
-//         // Configure these in appsettings.json or user secrets
-//         options.ClientId = builder.Configuration["Authentication:Google:ClientId"] ?? "";
-//         options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"] ?? "";
-//     })
 //     .AddMicrosoftAccount(options =>
 //     {
 //         // Configure these in appsettings.json or user secrets
@@ -81,6 +81,7 @@ builder.Services.AddScoped<IAnswerPrePopulationService, AnswerPrePopulationServi
 builder.Services.AddScoped<IResponseWorkflowService, ResponseWorkflowService>();
 builder.Services.AddScoped<IESGAnalyticsService, ESGAnalyticsService>();
 builder.Services.AddScoped<IFlexibleAnalyticsService, FlexibleAnalyticsService>();
+builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 
 // Configure authorization policies
 builder.Services.AddAuthorization(options =>

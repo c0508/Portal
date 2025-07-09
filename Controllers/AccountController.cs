@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using ESGPlatform.Models.Entities;
 using ESGPlatform.Models.ViewModels;
+using System.Security.Claims;
 
 namespace ESGPlatform.Controllers;
 
@@ -75,6 +76,135 @@ public class AccountController : Controller
             ModelState.AddModelError(string.Empty, "Invalid login attempt.");
         }
 
+        return View(model);
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public IActionResult ExternalLogin(string provider, string? returnUrl = null)
+    {
+        // Request a redirect to the external login provider.
+        var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Account", new { returnUrl });
+        var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+        return Challenge(properties, provider);
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> ExternalLoginCallback(string? returnUrl = null, string? remoteError = null)
+    {
+        if (remoteError != null)
+        {
+            ModelState.AddModelError(string.Empty, $"Error from external provider: {remoteError}");
+            return View(nameof(Login));
+        }
+        var info = await _signInManager.GetExternalLoginInfoAsync();
+        if (info == null)
+        {
+            return RedirectToAction(nameof(Login));
+        }
+
+        // Get user email from Microsoft
+        var email = info.Principal.FindFirstValue(ClaimTypes.Email);
+        
+        // Check if email domain is allowed
+        var allowedDomains = new[] { "es.ey.com" };
+        if (!allowedDomains.Any(domain => email?.EndsWith($"@{domain}") == true))
+        {
+            ModelState.AddModelError(string.Empty, "Access denied. Only users from authorized domains can sign in.");
+            return View(nameof(Login));
+        }
+
+        // Check if user is invited (optional - uncomment to enable invitation system)
+        // var context = HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+        // var invitation = await context.UserInvitations
+        //     .FirstOrDefaultAsync(i => i.Email == email && i.IsActive && !i.IsUsed);
+        // if (invitation == null)
+        // {
+        //     ModelState.AddModelError(string.Empty, "Access denied. You must be invited to use this platform. Please contact an administrator.");
+        //     return View(nameof(Login));
+        // }
+
+        // Sign in the user with this external login provider if the user already has a login.
+        var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
+        if (result.Succeeded)
+        {
+            _logger.LogInformation("User logged in with {Name} provider.", info.LoginProvider);
+            return RedirectToLocal(returnUrl);
+        }
+        if (result.IsLockedOut)
+        {
+            return RedirectToAction(nameof(Lockout));
+        }
+        else
+        {
+            // If the user does not have an account, then ask the user to create an account.
+            ViewData["ReturnUrl"] = returnUrl;
+            ViewData["LoginProvider"] = info.LoginProvider;
+            var name = info.Principal.FindFirstValue(ClaimTypes.Name);
+            var firstName = info.Principal.FindFirstValue(ClaimTypes.GivenName) ?? name?.Split(' ').FirstOrDefault() ?? "";
+            var lastName = info.Principal.FindFirstValue(ClaimTypes.Surname) ?? name?.Split(' ').LastOrDefault() ?? "";
+
+            return View("ExternalLoginConfirmation", new ExternalLoginConfirmationViewModel
+            {
+                Email = email,
+                FirstName = firstName,
+                LastName = lastName
+            });
+        }
+    }
+
+    [HttpPost]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ExternalLoginConfirmation(ExternalLoginConfirmationViewModel model, string? returnUrl = null)
+    {
+        if (ModelState.IsValid)
+        {
+            // Get the information about the user from the external login provider
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
+            {
+                throw new InvalidOperationException("Error loading external login information during confirmation.");
+            }
+            var user = new User
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                OrganizationId = 1, // Default to first organization for now
+                IsActive = true, // Set to false if you want admin approval
+                CreatedAt = DateTime.UtcNow,
+                EmailConfirmed = true // Auto-confirm for external logins
+            };
+            
+            // Optional: Set user as inactive until admin approval
+            // user.IsActive = false;
+            // user.RequiresAdminApproval = true;
+
+            var result = await _userManager.CreateAsync(user);
+            if (result.Succeeded)
+            {
+                result = await _userManager.AddLoginAsync(user, info);
+                if (result.Succeeded)
+                {
+                    // Add default role
+                    await _userManager.AddToRoleAsync(user, "Responder");
+                    
+                    await _signInManager.SignInAsync(user, isPersistent: false);
+                    _logger.LogInformation("User created an account using {Name} provider.", info.LoginProvider);
+                    return RedirectToLocal(returnUrl);
+                }
+            }
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+        }
+
+        ViewData["ReturnUrl"] = returnUrl;
         return View(model);
     }
 

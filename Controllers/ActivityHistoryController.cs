@@ -187,8 +187,8 @@ public class ActivityHistoryController : BaseController
             ActivityType = "ResponseChange",
             Action = "Updated",
             Description = $"Changed response to question: {rc.Response.Question.QuestionText}",
-            UserName = $"{rc.ChangedBy.FirstName} {rc.ChangedBy.LastName}",
-            UserEmail = rc.ChangedBy.Email ?? "",
+            UserName = $"{rc.ChangedBy?.FirstName} {rc.ChangedBy?.LastName}",
+            UserEmail = rc.ChangedBy?.Email ?? "",
             Timestamp = rc.ChangedAt,
             QuestionId = rc.Response.QuestionId,
             QuestionText = rc.Response.Question.QuestionText,
@@ -279,9 +279,9 @@ public class ActivityHistoryController : BaseController
                 Id = delegation.Id,
                 ActivityType = "Delegation",
                 Action = "Delegated",
-                Description = $"Delegated question to {delegation.ToUser.FirstName} {delegation.ToUser.LastName}: {delegation.Question.QuestionText}",
-                UserName = $"{delegation.FromUser.FirstName} {delegation.FromUser.LastName}",
-                UserEmail = delegation.FromUser.Email ?? "",
+                Description = $"Delegated question to {delegation.ToUser?.FirstName} {delegation.ToUser?.LastName}: {delegation.Question.QuestionText}",
+                UserName = $"{delegation.FromUser?.FirstName} {delegation.FromUser?.LastName}",
+                UserEmail = delegation.FromUser?.Email ?? "",
                 Timestamp = delegation.CreatedAt,
                 QuestionId = delegation.QuestionId,
                 QuestionText = delegation.Question.QuestionText,
@@ -303,8 +303,8 @@ public class ActivityHistoryController : BaseController
                     ActivityType = "Delegation",
                     Action = "Completed",
                     Description = $"Completed delegated question: {delegation.Question.QuestionText}",
-                    UserName = $"{delegation.ToUser.FirstName} {delegation.ToUser.LastName}",
-                    UserEmail = delegation.ToUser.Email ?? "",
+                    UserName = $"{delegation.ToUser?.FirstName} {delegation.ToUser?.LastName}",
+                    UserEmail = delegation.ToUser?.Email ?? "",
                     Timestamp = delegation.CompletedAt.Value,
                     QuestionId = delegation.QuestionId,
                     QuestionText = delegation.Question.QuestionText,
@@ -344,12 +344,12 @@ public class ActivityHistoryController : BaseController
 
         if (filter.QuestionnaireId.HasValue && filter.QuestionId.HasValue)
         {
-            query = query.Where(ral => ral.Question!.QuestionnaireId == filter.QuestionnaireId.Value);
+            query = query.Where(ral => ral.Question != null && ral.Question.QuestionnaireId == filter.QuestionnaireId.Value);
         }
 
         if (!string.IsNullOrEmpty(filter.Section) && filter.QuestionId.HasValue)
         {
-            query = query.Where(ral => ral.Question!.Section == filter.Section);
+            query = query.Where(ral => ral.Question != null && ral.Question.Section == filter.Section);
         }
 
         if (!string.IsNullOrEmpty(filter.UserId))
@@ -390,8 +390,8 @@ public class ActivityHistoryController : BaseController
             ActivityType = "Review",
             Action = ral.Action,
             Description = GetReviewDescription(ral),
-            UserName = $"{ral.User.FirstName} {ral.User.LastName}",
-            UserEmail = ral.User.Email ?? "",
+            UserName = $"{ral.User?.FirstName} {ral.User?.LastName}",
+            UserEmail = ral.User?.Email ?? "",
             Timestamp = ral.CreatedAt,
             QuestionId = ral.QuestionId,
             QuestionText = ral.Question?.QuestionText,
@@ -432,7 +432,7 @@ public class ActivityHistoryController : BaseController
 
         if (filter.QuestionnaireId.HasValue && filter.QuestionId.HasValue)
         {
-            query = query.Where(qac => qac.Question.QuestionnaireId == filter.QuestionnaireId.Value);
+            query = query.Where(qac => qac.Question != null && qac.Question.QuestionnaireId == filter.QuestionnaireId.Value);
         }
 
         if (!string.IsNullOrEmpty(filter.Section))
@@ -483,8 +483,8 @@ public class ActivityHistoryController : BaseController
             ActivityType = "QuestionAssignment",
             Action = qac.ChangeType, // "Created", "Modified", "Removed"
             Description = GetAssignmentChangeDescription(qac),
-            UserName = $"{qac.ChangedBy.FirstName} {qac.ChangedBy.LastName}",
-            UserEmail = qac.ChangedBy.Email ?? "",
+            UserName = $"{qac.ChangedBy?.FirstName} {qac.ChangedBy?.LastName}",
+            UserEmail = qac.ChangedBy?.Email ?? "",
             Timestamp = qac.ChangedAt,
             QuestionId = qac.QuestionId,
             QuestionText = qac.Question?.QuestionText ?? $"Section: {qac.SectionName}",
