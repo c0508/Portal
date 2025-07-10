@@ -503,24 +503,120 @@ public class DelegationController : BaseController
 
     private async Task<CampaignAssignment?> GetAssignmentWithAccessCheckAsync(int assignmentId)
     {
-        var assignment = await _context.CampaignAssignments
+        // First, get the assignment with basic access control
+        var assignmentQuery = _context.CampaignAssignments
             .Include(ca => ca.Campaign)
             .Include(ca => ca.QuestionnaireVersion)
                 .ThenInclude(qv => qv.Questionnaire)
-            .FirstOrDefaultAsync(ca => ca.Id == assignmentId);
+            .Where(ca => ca.Id == assignmentId);
 
-        if (assignment == null) return null;
-
-        // Access control
+        // Apply organization-level access control
         if (!IsPlatformAdmin)
         {
-            if (IsCurrentOrgSupplierType && assignment.TargetOrganizationId != CurrentOrganizationId)
+            if (IsCurrentOrgSupplierType)
+            {
+                // Supplier organizations can only see assignments targeted to them
+                assignmentQuery = assignmentQuery.Where(ca => ca.TargetOrganizationId == CurrentOrganizationId);
+            }
+            else if (IsCurrentOrgPlatformType)
+            {
+                // Platform organizations can see assignments for campaigns they created
+                assignmentQuery = assignmentQuery.Where(ca => ca.Campaign.OrganizationId == CurrentOrganizationId);
+            }
+            else
+            {
+                // If user is not a platform admin and doesn't have a recognized organization type, deny access
                 return null;
-            if (IsCurrentOrgPlatformType && assignment.Campaign.OrganizationId != CurrentOrganizationId)
-                return null;
+            }
+        }
+
+        var assignment = await assignmentQuery.FirstOrDefaultAsync();
+        
+        if (assignment == null)
+        {
+            return null;
+        }
+
+        // Additional user-specific authorization checks
+        if (!await HasUserAccessToAssignment(assignmentId, CurrentUserId))
+        {
+            return null;
         }
 
         return assignment;
+    }
+
+    /// <summary>
+    /// Checks if the current user has access to the specified assignment
+    /// </summary>
+    private async Task<bool> HasUserAccessToAssignment(int assignmentId, string userId)
+    {
+        // Platform admins have access to everything
+        if (IsPlatformAdmin)
+        {
+            return true;
+        }
+
+        // Check if user is the lead responder for this assignment
+        var assignment = await _context.CampaignAssignments
+            .Where(ca => ca.Id == assignmentId)
+            .Select(ca => new { ca.LeadResponderId, ca.TargetOrganizationId, ca.Campaign.OrganizationId })
+            .FirstOrDefaultAsync();
+
+        if (assignment == null)
+        {
+            return false;
+        }
+
+        // Lead responder has access
+        if (assignment.LeadResponderId == userId)
+        {
+            return true;
+        }
+
+        // Check organization-level access
+        if (IsCurrentOrgSupplierType && assignment.TargetOrganizationId != CurrentOrganizationId)
+        {
+            return false;
+        }
+
+        if (IsCurrentOrgPlatformType && assignment.Campaign.OrganizationId != CurrentOrganizationId)
+        {
+            return false;
+        }
+
+        // Check if user has any delegations for this assignment
+        var hasDelegations = await _context.Delegations
+            .AnyAsync(d => d.CampaignAssignmentId == assignmentId && 
+                          d.ToUserId == userId && 
+                          d.IsActive);
+
+        if (hasDelegations)
+        {
+            return true;
+        }
+
+        // Check if user has any question assignments for this assignment
+        var hasQuestionAssignments = await _context.QuestionAssignments
+            .AnyAsync(qa => qa.CampaignAssignmentId == assignmentId && 
+                           qa.AssignedUserId == userId && 
+                           qa.IsActive);
+
+        if (hasQuestionAssignments)
+        {
+            return true;
+        }
+
+        // Check if user is a reviewer for this assignment
+        var isReviewer = await _context.ReviewAssignments
+            .AnyAsync(ra => ra.CampaignAssignmentId == assignmentId && ra.ReviewerId == userId);
+
+        if (isReviewer)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private async Task<IActionResult> ReloadBulkDelegationView(BulkDelegationViewModel model)

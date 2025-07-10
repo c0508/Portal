@@ -10,6 +10,7 @@ using System.Text.Json;
 namespace ESGPlatform.Controllers;
 
 [Authorize]
+[ValidateAntiForgeryToken]
 public class ResponseController : BaseController
 {
     private readonly ApplicationDbContext _context;
@@ -880,6 +881,7 @@ public class ResponseController : BaseController
     // Helper method to get assignment with proper access control
     private async Task<CampaignAssignment?> GetAssignmentWithAccessCheckAsync(int assignmentId)
     {
+        // First, get the assignment with basic access control
         var assignmentQuery = _context.CampaignAssignments
             .Include(ca => ca.Campaign)
             .Include(ca => ca.QuestionnaireVersion)
@@ -888,7 +890,7 @@ public class ResponseController : BaseController
             .Include(ca => ca.TargetOrganization)
             .Where(ca => ca.Id == assignmentId);
 
-        // Apply access control filtering
+        // Apply organization-level access control
         if (!IsPlatformAdmin)
         {
             if (IsCurrentOrgSupplierType)
@@ -901,21 +903,239 @@ public class ResponseController : BaseController
                 // Platform organizations can see assignments for campaigns they created
                 assignmentQuery = assignmentQuery.Where(ca => ca.Campaign.OrganizationId == CurrentOrganizationId);
             }
+            else
+            {
+                // If user is not a platform admin and doesn't have a recognized organization type, deny access
+                return null;
+            }
         }
 
         var assignment = await assignmentQuery.FirstOrDefaultAsync();
         
-        if (assignment != null)
+        if (assignment == null)
         {
-            // Load responses separately to bypass organization filters
-            assignment.Responses = await _context.Responses
-                .IgnoreQueryFilters()
-                .Include(r => r.FileUploads)
-                .Where(r => r.CampaignAssignmentId == assignment.Id)
-                .ToListAsync();
+            return null;
         }
+
+        // Additional user-specific authorization checks
+        var hasAccess = await HasUserAccessToAssignment(assignmentId, CurrentUserId);
+        if (!hasAccess)
+        {
+            AuditAuthorizationAttempt(CurrentUserId, assignmentId, false, "No valid authorization found");
+            return null;
+        }
+
+        AuditAuthorizationAttempt(CurrentUserId, assignmentId, true, "Access granted");
+        
+        // Load responses with proper authorization
+        assignment.Responses = await LoadAuthorizedResponsesAsync(assignment.Id, CurrentUserId);
         
         return assignment;
+    }
+
+    /// <summary>
+    /// Checks if the current user has access to the specified assignment
+    /// </summary>
+    private async Task<bool> HasUserAccessToAssignment(int assignmentId, string userId)
+    {
+        // Platform admins have access to everything
+        if (IsPlatformAdmin)
+        {
+            _logger.LogInformation("Platform admin {UserId} accessing assignment {AssignmentId}", userId, assignmentId);
+            return true;
+        }
+
+        // Check if user is the lead responder for this assignment
+        var assignment = await _context.CampaignAssignments
+            .Where(ca => ca.Id == assignmentId)
+            .Select(ca => new { ca.LeadResponderId, ca.TargetOrganizationId, ca.Campaign.OrganizationId })
+            .FirstOrDefaultAsync();
+
+        if (assignment == null)
+        {
+            _logger.LogWarning("User {UserId} attempted to access non-existent assignment {AssignmentId}", userId, assignmentId);
+            return false;
+        }
+
+        // Lead responder has access
+        if (assignment.LeadResponderId == userId)
+        {
+            _logger.LogInformation("Lead responder {UserId} accessing assignment {AssignmentId}", userId, assignmentId);
+            return true;
+        }
+
+        // Check organization-level access
+        if (IsCurrentOrgSupplierType && assignment.TargetOrganizationId != CurrentOrganizationId)
+        {
+            _logger.LogWarning("Supplier user {UserId} from organization {UserOrgId} attempted to access assignment {AssignmentId} for organization {AssignmentOrgId}", 
+                userId, CurrentOrganizationId, assignmentId, assignment.TargetOrganizationId);
+            return false;
+        }
+
+        if (IsCurrentOrgPlatformType && assignment.Campaign.OrganizationId != CurrentOrganizationId)
+        {
+            _logger.LogWarning("Platform user {UserId} from organization {UserOrgId} attempted to access assignment {AssignmentId} for campaign organization {CampaignOrgId}", 
+                userId, CurrentOrganizationId, assignmentId, assignment.Campaign.OrganizationId);
+            return false;
+        }
+
+        // Check if user has any delegations for this assignment
+        var hasDelegations = await _context.Delegations
+            .AnyAsync(d => d.CampaignAssignmentId == assignmentId && 
+                          d.ToUserId == userId && 
+                          d.IsActive);
+
+        if (hasDelegations)
+        {
+            _logger.LogInformation("User {UserId} accessing assignment {AssignmentId} via delegation", userId, assignmentId);
+            return true;
+        }
+
+        // Check if user has any question assignments for this assignment
+        var hasQuestionAssignments = await _context.QuestionAssignments
+            .AnyAsync(qa => qa.CampaignAssignmentId == assignmentId && 
+                           qa.AssignedUserId == userId && 
+                           qa.IsActive);
+
+        if (hasQuestionAssignments)
+        {
+            _logger.LogInformation("User {UserId} accessing assignment {AssignmentId} via question assignment", userId, assignmentId);
+            return true;
+        }
+
+        // Check if user is a reviewer for this assignment
+        var isReviewer = await _context.ReviewAssignments
+            .AnyAsync(ra => ra.CampaignAssignmentId == assignmentId && ra.ReviewerId == userId);
+
+        if (isReviewer)
+        {
+            _logger.LogInformation("Reviewer {UserId} accessing assignment {AssignmentId}", userId, assignmentId);
+            return true;
+        }
+
+        _logger.LogWarning("User {UserId} denied access to assignment {AssignmentId} - no valid authorization found", userId, assignmentId);
+        return false;
+    }
+
+    /// <summary>
+    /// Audits authorization patterns for security monitoring
+    /// </summary>
+    private void AuditAuthorizationAttempt(string userId, int assignmentId, bool wasGranted, string reason)
+    {
+        var auditData = new
+        {
+            Timestamp = DateTime.UtcNow,
+            UserId = userId,
+            AssignmentId = assignmentId,
+            WasGranted = wasGranted,
+            Reason = reason,
+            UserAgent = Request.Headers["User-Agent"].ToString(),
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            OrganizationId = CurrentOrganizationId,
+            IsPlatformAdmin = IsPlatformAdmin,
+            IsCurrentOrgSupplierType = IsCurrentOrgSupplierType,
+            IsCurrentOrgPlatformType = IsCurrentOrgPlatformType
+        };
+
+        _logger.LogInformation("Authorization audit: {@AuditData}", auditData);
+    }
+
+    /// <summary>
+    /// Loads responses with proper authorization based on user's specific access rights
+    /// </summary>
+    private async Task<List<Response>> LoadAuthorizedResponsesAsync(int assignmentId, string userId)
+    {
+        var responsesQuery = _context.Responses
+            .Include(r => r.FileUploads)
+            .Where(r => r.CampaignAssignmentId == assignmentId);
+
+        // Platform admins can see all responses
+        if (IsPlatformAdmin)
+        {
+            return await responsesQuery.ToListAsync();
+        }
+
+        // Get user's specific access rights
+        var userDelegations = await _context.Delegations
+            .Where(d => d.CampaignAssignmentId == assignmentId && 
+                       d.ToUserId == userId && 
+                       d.IsActive)
+            .Select(d => d.QuestionId)
+            .ToListAsync();
+
+        var userQuestionAssignments = await _context.QuestionAssignments
+            .Where(qa => qa.CampaignAssignmentId == assignmentId && 
+                        qa.AssignedUserId == userId && 
+                        qa.IsActive)
+            .ToListAsync();
+
+        // Get directly assigned question IDs
+        var directlyAssignedQuestionIds = userQuestionAssignments
+            .Where(qa => qa.QuestionId.HasValue)
+            .Select(qa => qa.QuestionId!.Value)
+            .ToList();
+
+        // Get section-assigned question IDs
+        var assignedSections = userQuestionAssignments
+            .Where(qa => !string.IsNullOrEmpty(qa.SectionName))
+            .Select(qa => qa.SectionName)
+            .Distinct()
+            .ToList();
+
+        List<int> sectionAssignedQuestionIds = new List<int>();
+        if (assignedSections.Any())
+        {
+            var assignment = await _context.CampaignAssignments
+                .Where(ca => ca.Id == assignmentId)
+                .Select(ca => ca.QuestionnaireVersion.QuestionnaireId)
+                .FirstOrDefaultAsync();
+
+            if (assignment.HasValue)
+            {
+                sectionAssignedQuestionIds = await _context.Questions
+                    .Where(q => q.QuestionnaireId == assignment.Value &&
+                               assignedSections.Contains(q.Section ?? "Other"))
+                    .Select(q => q.Id)
+                    .ToListAsync();
+            }
+        }
+
+        // Combine all authorized question IDs
+        var authorizedQuestionIds = userDelegations
+            .Union(directlyAssignedQuestionIds)
+            .Union(sectionAssignedQuestionIds)
+            .ToList();
+
+        // If user has no specific question assignments or delegations, check if they're the lead responder
+        if (!authorizedQuestionIds.Any())
+        {
+            var isLeadResponder = await _context.CampaignAssignments
+                .AnyAsync(ca => ca.Id == assignmentId && ca.LeadResponderId == userId);
+
+            if (isLeadResponder)
+            {
+                // Lead responder can see all responses
+                return await responsesQuery.ToListAsync();
+            }
+
+            // Check if user is a reviewer
+            var isReviewer = await _context.ReviewAssignments
+                .AnyAsync(ra => ra.CampaignAssignmentId == assignmentId && ra.ReviewerId == userId);
+
+            if (isReviewer)
+            {
+                // Reviewers can see all responses
+                return await responsesQuery.ToListAsync();
+            }
+
+            // No access - return empty list
+            return new List<Response>();
+        }
+
+        // Filter responses to only show authorized questions
+        return await responsesQuery
+            .Where(r => authorizedQuestionIds.Contains(r.QuestionId))
+            .ToListAsync();
     }
 
     #region Private Helper Methods
