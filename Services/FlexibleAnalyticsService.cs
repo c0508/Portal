@@ -160,7 +160,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
         if (sectors.Any() && !string.IsNullOrEmpty(selectedAttribute))
         {
             _logger.LogInformation($"Filtering available companies by attribute '{selectedAttribute}' with values: {string.Join(", ", sectors)}");
-            query = query.Where(r => r.CampaignAssignment.OrganizationRelationship.Attributes
+            query = query.Where(r => r.CampaignAssignment.OrganizationRelationship!.Attributes!
                 .Any(a => a.AttributeType == selectedAttribute && sectors.Contains(a.AttributeValue)));
         }
 
@@ -168,7 +168,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
 
         // Get the most common attribute type to use for sector information
         var allAttributes = responses
-            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>())
+            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
             .ToList();
             
         var primaryAttributeType = allAttributes.Any() ? 
@@ -212,7 +212,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
 
         // Get the most common attribute type to use as the primary filter
         var allAttributes = responses
-            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>())
+            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
             .ToList();
             
         if (!allAttributes.Any())
@@ -257,7 +257,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
 
         // Get all attributes from all organizations
         var allAttributes = responses
-            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>())
+            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
             .ToList();
 
         // Group by attribute type and collect values
@@ -378,7 +378,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
             if (sampleResponse?.CampaignAssignment.OrganizationRelationship?.Attributes?.Any() == true)
             {
                 var allAttributes = allResponses
-                    .SelectMany(r => r.CampaignAssignment.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>())
+                    .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
                     .ToList();
                     
                 if (allAttributes.Any())
@@ -847,7 +847,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
         return chartData;
     }
 
-    private async Task<FlexibleAnalyticsDataTable> GenerateDataTableAsync(List<Response> baseData, FlexibleAnalyticsFilters filters)
+    private Task<FlexibleAnalyticsDataTable> GenerateDataTableAsync(List<Response> baseData, FlexibleAnalyticsFilters filters)
     {
         // Get total count for pagination
         var totalCount = baseData.Count;
@@ -885,7 +885,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
             OrganizationAttributes = GetAllAttributesFromResponse(r)
         }).ToList();
 
-        return new FlexibleAnalyticsDataTable
+        return Task.FromResult(new FlexibleAnalyticsDataTable
         {
             Rows = rows,
             TotalRows = totalCount,
@@ -893,7 +893,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
             PageSize = filters.PageSize,
             TotalPages = (int)Math.Ceiling((double)totalCount / filters.PageSize),
             Columns = GetTableColumns()
-        };
+        });
     }
 
     // Helper methods

@@ -58,21 +58,23 @@ public class AccountController : Controller
                     await _userManager.UpdateAsync(user);
                 }
 
-                _logger.LogInformation("User logged in: {Email}", model.Email);
+                _logger.LogInformation("User logged in successfully: {EmailHash}", HashEmail(model.Email));
                 return RedirectToLocal(returnUrl);
             }
             
             if (result.RequiresTwoFactor)
             {
+                _logger.LogInformation("User requires 2FA: {EmailHash}", HashEmail(model.Email));
                 return RedirectToAction(nameof(LoginWith2fa), new { returnUrl, model.RememberMe });
             }
             
             if (result.IsLockedOut)
             {
-                _logger.LogWarning("User account locked out: {Email}", model.Email);
+                _logger.LogWarning("User account locked out: {EmailHash}", HashEmail(model.Email));
                 return RedirectToAction(nameof(Lockout));
             }
             
+            _logger.LogWarning("Invalid login attempt for: {EmailHash}", HashEmail(model.Email));
             ModelState.AddModelError(string.Empty, "Invalid login attempt.");
         }
 
@@ -148,7 +150,7 @@ public class AccountController : Controller
 
             return View("ExternalLoginConfirmation", new ExternalLoginConfirmationViewModel
             {
-                Email = email,
+                Email = email ?? "",
                 FirstName = firstName,
                 LastName = lastName
             });
@@ -303,5 +305,18 @@ public class AccountController : Controller
         {
             return RedirectToAction(nameof(HomeController.Index), "Home");
         }
+    }
+
+    /// <summary>
+    /// Creates a hash of the email for logging purposes to avoid exposing sensitive data
+    /// </summary>
+    private static string HashEmail(string email)
+    {
+        if (string.IsNullOrEmpty(email))
+            return "null";
+            
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(email));
+        return Convert.ToBase64String(hashBytes).Substring(0, 8); // First 8 characters of hash
     }
 } 

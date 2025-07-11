@@ -356,6 +356,23 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole, string
             .IsUnique()
             .HasDatabaseName("IX_QuestionQuestionAttribute_Question_Attribute_Unique");
 
+        // Add data validation constraints
+        builder.Entity<Campaign>()
+            .ToTable(t => t.HasCheckConstraint("CK_Campaign_Deadline_Future", 
+                "Deadline IS NULL OR Deadline > CreatedAt"));
+
+        builder.Entity<CampaignAssignment>()
+            .ToTable(t => t.HasCheckConstraint("CK_CampaignAssignment_ValidStatus", 
+                "Status IN (0, 1, 2, 3, 4, 5)"));
+
+        builder.Entity<Response>()
+            .ToTable(t => t.HasCheckConstraint("CK_Response_ValidStatus", 
+                "Status IN (0, 1, 2, 3, 4, 5)"));
+
+        builder.Entity<FileUpload>()
+            .ToTable(t => t.HasCheckConstraint("CK_FileUpload_ValidSize", 
+                "FileSize > 0 AND FileSize <= 10485760")); // 10MB max
+
         // Organization Attribute Master Data relationships
         builder.Entity<OrganizationAttributeValue>()
             .HasOne(oav => oav.AttributeType)

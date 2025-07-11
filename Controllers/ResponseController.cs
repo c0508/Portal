@@ -576,6 +576,7 @@ public class ResponseController : BaseController
 
     // POST: Response/UploadFile
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadFile(int assignmentId, int questionId, IFormFile file)
     {
         try
@@ -651,6 +652,7 @@ public class ResponseController : BaseController
 
     // POST: Response/DeleteFile
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteFile(int fileId)
     {
         try
@@ -664,7 +666,9 @@ public class ResponseController : BaseController
                 return Json(new { success = false, message = "File not found" });
 
             // Check access rights
-            var assignment = await GetAssignmentWithAccessCheckAsync(fileUpload.Response.CampaignAssignmentId);
+            if (fileUpload.Response == null)
+                return Json(new { success = false, message = "Access denied" });
+            var assignment = await GetAssignmentWithAccessCheckAsync(fileUpload.Response!.CampaignAssignmentId);
             if (assignment == null)
                 return Json(new { success = false, message = "Access denied" });
 
@@ -880,6 +884,20 @@ public class ResponseController : BaseController
     // Helper method to get assignment with proper access control
     private async Task<CampaignAssignment?> GetAssignmentWithAccessCheckAsync(int assignmentId)
     {
+        // Validate input
+        if (assignmentId <= 0)
+        {
+            _logger.LogWarning("Invalid assignment ID provided: {AssignmentId}", assignmentId);
+            return null;
+        }
+
+        // Check if user is authenticated
+        if (string.IsNullOrEmpty(CurrentUserId))
+        {
+            _logger.LogWarning("Unauthenticated user attempted to access assignment {AssignmentId}", assignmentId);
+            return null;
+        }
+
         var assignmentQuery = _context.CampaignAssignments
             .Include(ca => ca.Campaign)
             .Include(ca => ca.QuestionnaireVersion)
@@ -888,7 +906,7 @@ public class ResponseController : BaseController
             .Include(ca => ca.TargetOrganization)
             .Where(ca => ca.Id == assignmentId);
 
-        // Apply access control filtering
+        // Apply strict access control filtering
         if (!IsPlatformAdmin)
         {
             if (IsCurrentOrgSupplierType)
@@ -901,26 +919,76 @@ public class ResponseController : BaseController
                 // Platform organizations can see assignments for campaigns they created
                 assignmentQuery = assignmentQuery.Where(ca => ca.Campaign.OrganizationId == CurrentOrganizationId);
             }
+            else
+            {
+                // If user doesn't have a valid organization type, deny access
+                _logger.LogWarning("User {UserId} has invalid organization type for assignment {AssignmentId}", CurrentUserId, assignmentId);
+                return null;
+            }
         }
 
         var assignment = await assignmentQuery.FirstOrDefaultAsync();
         
-        if (assignment != null)
+        if (assignment == null)
         {
-            // Load responses separately to bypass organization filters
-            assignment.Responses = await _context.Responses
-                .IgnoreQueryFilters()
-                .Include(r => r.FileUploads)
-                .Where(r => r.CampaignAssignmentId == assignment.Id)
-                .ToListAsync();
+            _logger.LogWarning("Assignment {AssignmentId} not found or access denied for user {UserId}", assignmentId, CurrentUserId);
+            return null;
         }
+
+        // Additional security check: Verify user has direct access to this assignment
+        bool hasDirectAccess = await HasDirectAccessToAssignment(assignmentId, CurrentUserId);
+        if (!hasDirectAccess)
+        {
+            _logger.LogWarning("User {UserId} denied access to assignment {AssignmentId} - no direct access", CurrentUserId, assignmentId);
+            return null;
+        }
+
+        // Load responses with proper access control
+        assignment.Responses = await _context.Responses
+            .Include(r => r.FileUploads)
+            .Where(r => r.CampaignAssignmentId == assignment.Id)
+            .ToListAsync();
         
+        _logger.LogInformation("User {UserId} successfully accessed assignment {AssignmentId}", CurrentUserId, assignmentId);
         return assignment;
+    }
+
+    /// <summary>
+    /// Verifies that the user has direct access to the assignment through various means
+    /// </summary>
+    private async Task<bool> HasDirectAccessToAssignment(int assignmentId, string userId)
+    {
+        // Check if user is the lead responder
+        var isLeadResponder = await _context.CampaignAssignments
+            .AnyAsync(ca => ca.Id == assignmentId && ca.LeadResponderId == userId);
+
+        if (isLeadResponder)
+            return true;
+
+        // Check if user has delegations for this assignment
+        var hasDelegation = await _context.Delegations
+            .AnyAsync(d => d.CampaignAssignmentId == assignmentId && d.ToUserId == userId && d.IsActive);
+
+        if (hasDelegation)
+            return true;
+
+        // Check if user has question assignments for this assignment
+        var hasQuestionAssignment = await _context.QuestionAssignments
+            .AnyAsync(qa => qa.CampaignAssignmentId == assignmentId && qa.AssignedUserId == userId);
+
+        if (hasQuestionAssignment)
+            return true;
+
+        // Check if user is a reviewer for this assignment
+        var isReviewer = await _context.ReviewAssignments
+            .AnyAsync(ra => ra.CampaignAssignmentId == assignmentId && ra.ReviewerId == userId);
+
+        return isReviewer;
     }
 
     #region Private Helper Methods
 
-    private async Task<List<AssignmentSummaryViewModel>> ConvertToAssignmentSummaries(
+    private Task<List<AssignmentSummaryViewModel>> ConvertToAssignmentSummaries(
         List<CampaignAssignment> assignments)
     {
         var summaries = new List<AssignmentSummaryViewModel>();
@@ -947,7 +1015,7 @@ public class ResponseController : BaseController
             });
         }
 
-        return summaries;
+        return Task.FromResult(summaries);
     }
 
     private List<AssignmentSummaryViewModel> ConvertDelegationsToAssignmentSummaries(
@@ -1328,7 +1396,7 @@ public class ResponseController : BaseController
         };
     }
 
-    private async Task<SubmissionReviewViewModel> BuildSubmissionReviewViewModel(
+    private Task<SubmissionReviewViewModel> BuildSubmissionReviewViewModel(
         CampaignAssignment assignment)
     {
         var questions = assignment.QuestionnaireVersion?.Questionnaire?.Questions?
@@ -1347,7 +1415,7 @@ public class ResponseController : BaseController
             };
         }).ToList();
 
-        return new SubmissionReviewViewModel
+        return Task.FromResult(new SubmissionReviewViewModel
         {
             AssignmentId = assignment.Id,
             CampaignName = assignment.Campaign.Name,
@@ -1361,7 +1429,7 @@ public class ResponseController : BaseController
             AnsweredQuestions = assignment.Responses.Count,
             CompletionPercentage = questions.Count > 0 ? 
                 (int)((double)assignment.Responses.Count / questions.Count * 100) : 0
-        };
+        });
     }
 
     private async Task<bool> HasDelegationForAssignment(int assignmentId, string userId)
@@ -1545,18 +1613,18 @@ public class ResponseController : BaseController
         };
     }
 
-    private string FormatNumericResponse(Response response)
+    private string? FormatNumericResponse(Response response)
     {
         if (response.NumericValue == null) return null;
         
         var question = response.Question;
         var value = response.NumericValue.Value.ToString("0.##");
         
-        if (question.IsPercentage)
+        if (question?.IsPercentage == true)
         {
             return $"{value}%";
         }
-        else if (!string.IsNullOrEmpty(question.Unit))
+        else if (!string.IsNullOrEmpty(question?.Unit))
         {
             return $"{value} {question.Unit}";
         }

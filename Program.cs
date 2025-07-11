@@ -9,13 +9,23 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+}
+
 var sqlPassword = Environment.GetEnvironmentVariable("SQL_PASSWORD") ?? 
                   builder.Configuration["ConnectionStrings:DefaultConnection:Password"];
 if (!string.IsNullOrEmpty(sqlPassword))
 {
     connectionString = connectionString.Replace("${SQL_PASSWORD}", sqlPassword);
 }
-Console.WriteLine($"Connection String: {connectionString}");
+
+// Only log connection string in development environment
+if (builder.Environment.IsDevelopment())
+{
+    Console.WriteLine($"Connection String: {connectionString}");
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
@@ -23,12 +33,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Configure Identity - using custom controllers instead of default UI
 builder.Services.AddIdentity<User, IdentityRole>(options =>
 {
-    // Password settings
+    // Password settings - strengthened for production
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = !builder.Environment.IsDevelopment(); // Require special chars in production
+    options.Password.RequiredLength = builder.Environment.IsDevelopment() ? 8 : 12; // Longer passwords in production
+    options.Password.RequiredUniqueChars = builder.Environment.IsDevelopment() ? 1 : 4; // More unique chars in production
 
     // Lockout settings
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(30);
@@ -37,8 +48,8 @@ builder.Services.AddIdentity<User, IdentityRole>(options =>
 
     // User settings
     options.User.RequireUniqueEmail = true;
-    options.SignIn.RequireConfirmedEmail = false; // Set to true for production
-    options.SignIn.RequireConfirmedAccount = false;
+    options.SignIn.RequireConfirmedEmail = !builder.Environment.IsDevelopment(); // Only require in production
+    options.SignIn.RequireConfirmedAccount = !builder.Environment.IsDevelopment(); // Only require in production
 })
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();

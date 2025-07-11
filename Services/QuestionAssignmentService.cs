@@ -207,8 +207,10 @@ public class QuestionAssignmentService
         // Update user assignment counts
         foreach (var user in availableUsers)
         {
-            user.AssignedQuestions = assignments.Count(a => a.AssignedUserId == user.UserId && a.QuestionId.HasValue);
-            user.AssignedSections = assignments.Count(a => a.AssignedUserId == user.UserId && !string.IsNullOrEmpty(a.SectionName));
+            var questionCount = assignments.Count(a => a.AssignedUserId == user.UserId && a.QuestionId.HasValue);
+            var sectionCount = assignments.Count(a => a.AssignedUserId == user.UserId && !string.IsNullOrEmpty(a.SectionName));
+            user.AssignedQuestions = questionCount;
+            user.AssignedSections = sectionCount;
         }
 
         return new QuestionAssignmentManagementViewModel
@@ -355,7 +357,7 @@ public class QuestionAssignmentService
         // Get directly assigned questions
         var directlyAssignedQuestions = await _context.QuestionAssignments
             .Where(qa => qa.AssignedUserId == userId && qa.CampaignAssignmentId == campaignAssignmentId && qa.QuestionId.HasValue)
-            .Select(qa => qa.QuestionId.Value)
+            .Select(qa => qa.QuestionId!.Value)
             .ToListAsync();
 
         questionIds.AddRange(directlyAssignedQuestions);

@@ -139,6 +139,12 @@
                                     </div>
                                 </div>
 
+                                <!-- Hidden field to preserve ImportFromExcel when there are imported questions -->
+                                @if (Model.HasImportedQuestions)
+                                {
+                                    <input type="hidden" asp-for="ImportFromExcel" value="true" />
+                                }
+                                
                                 <!-- Imported Questions Preview -->
                                 @if (Model.HasImportedQuestions)
                                 {
@@ -152,7 +158,7 @@
                                             <i class="bi bi-info-circle me-2"></i>
                                             Review the imported questions below. Fix any validation errors before creating the questionnaire.
                                             <br><small class="mt-1 d-block">
-                                                <strong>Note:</strong> Keep the Excel file selected when clicking "Create Questionnaire" to import these questions.
+                                                <strong>Note:</strong> The imported questions will be preserved when you click "Create Questionnaire".
                                             </small>
                                         </div>
 

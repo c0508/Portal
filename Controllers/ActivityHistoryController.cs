@@ -344,12 +344,12 @@ public class ActivityHistoryController : BaseController
 
         if (filter.QuestionnaireId.HasValue && filter.QuestionId.HasValue)
         {
-            query = query.Where(ral => ral.Question != null && ral.Question.QuestionnaireId == filter.QuestionnaireId.Value);
+            query = query.Where(ral => ral.Question != null && ral.Question!.QuestionnaireId == filter.QuestionnaireId.Value);
         }
 
         if (!string.IsNullOrEmpty(filter.Section) && filter.QuestionId.HasValue)
         {
-            query = query.Where(ral => ral.Question != null && ral.Question.Section == filter.Section);
+            query = query.Where(ral => ral.Question != null && ral.Question!.Section == filter.Section);
         }
 
         if (!string.IsNullOrEmpty(filter.UserId))
@@ -370,7 +370,7 @@ public class ActivityHistoryController : BaseController
         if (!string.IsNullOrEmpty(filter.SearchText))
         {
             query = query.Where(ral => ral.CampaignAssignment.Campaign.Name.Contains(filter.SearchText) ||
-                                      (ral.Question != null && ral.Question.QuestionText.Contains(filter.SearchText)));
+                                      (ral.Question != null && ral.Question!.QuestionText.Contains(filter.SearchText)));
         }
 
         if (filter.ActivityType != "All" && filter.ActivityType == "Review")
@@ -396,7 +396,7 @@ public class ActivityHistoryController : BaseController
             QuestionId = ral.QuestionId,
             QuestionText = ral.Question?.QuestionText,
             CampaignName = ral.CampaignAssignment.Campaign.Name,
-            QuestionnaireName = ral.Question?.Questionnaire.Title,
+            QuestionnaireName = ral.Question?.Questionnaire?.Title ?? "Unknown",
             Section = ral.Question?.Section,
             OldValue = ral.FromStatus,
             NewValue = ral.ToStatus,
@@ -432,14 +432,14 @@ public class ActivityHistoryController : BaseController
 
         if (filter.QuestionnaireId.HasValue && filter.QuestionId.HasValue)
         {
-            query = query.Where(qac => qac.Question != null && qac.Question.QuestionnaireId == filter.QuestionnaireId.Value);
+            query = query.Where(qac => qac.Question != null && qac.Question!.QuestionnaireId == filter.QuestionnaireId.Value);
         }
 
         if (!string.IsNullOrEmpty(filter.Section))
         {
             // For section assignments or questions in specific sections
             query = query.Where(qac => qac.SectionName == filter.Section || 
-                                      (qac.Question != null && qac.Question.Section == filter.Section));
+                                      (qac.Question != null && qac.Question!.Section == filter.Section));
         }
 
         if (!string.IsNullOrEmpty(filter.UserId))
@@ -461,7 +461,7 @@ public class ActivityHistoryController : BaseController
 
         if (!string.IsNullOrEmpty(filter.SearchText))
         {
-            query = query.Where(qac => (qac.Question != null && qac.Question.QuestionText.Contains(filter.SearchText)) ||
+            query = query.Where(qac => (qac.Question != null && qac.Question!.QuestionText.Contains(filter.SearchText)) ||
                                       qac.CampaignAssignment.Campaign.Name.Contains(filter.SearchText) ||
                                       (qac.SectionName != null && qac.SectionName.Contains(filter.SearchText)));
         }
@@ -489,7 +489,7 @@ public class ActivityHistoryController : BaseController
             QuestionId = qac.QuestionId,
             QuestionText = qac.Question?.QuestionText ?? $"Section: {qac.SectionName}",
             CampaignName = qac.CampaignAssignment.Campaign.Name,
-            QuestionnaireName = qac.Question?.Questionnaire.Title ?? "N/A",
+            QuestionnaireName = qac.Question?.Questionnaire?.Title ?? "N/A",
             Section = qac.SectionName ?? qac.Question?.Section,
             OldValue = GetAssignmentOldValue(qac),
             NewValue = GetAssignmentNewValue(qac),

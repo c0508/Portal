@@ -11,9 +11,9 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2>Conditional Questions</h2>
-                    <p class="text-muted">@questionnaire.Title</p>
+                    <p class="text-muted">@(questionnaire?.Title ?? "Unknown Questionnaire")</p>
                 </div>
-                <a href="@Url.Action("Details", "Questionnaire", new { id = questionnaire.Id })" class="btn btn-secondary">
+                                                <a href="@Url.Action("Details", "Questionnaire", new { id = questionnaire?.Id ?? 0 })" class="btn btn-secondary">
                     <i class="fas fa-arrow-left"></i> Back to Questionnaire
                 </a>
             </div>
@@ -96,7 +96,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
-                    @if (questions.Any(q => q.Dependencies.Any()))
+                    @if (questions.Any(q => q.Dependencies != null && q.Dependencies.Any()))
                     {
                         <div class="table-responsive">
                             <table class="table table-striped">
@@ -111,7 +111,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var question in questions.Where(q => q.Dependencies.Any()))
+                                    @foreach (var question in questions.Where(q => q.Dependencies != null && q.Dependencies.Any()))
                                     {
                                         @foreach (var dependency in question.Dependencies.OrderBy(d => d.Id))
                                         {
