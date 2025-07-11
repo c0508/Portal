@@ -182,7 +182,7 @@
                                             <td>
                                                 <div class="fw-semibold">Q@(assignment.Question?.DisplayOrder)</div>
                                                 <small class="text-muted">
-                                                    @(assignment.Question?.QuestionText != null && assignment.Question.QuestionText.Length > 50 ? assignment.Question.QuestionText.Substring(0, 50) + "..." : assignment.Question?.QuestionText)
+                                                    @(assignment.Question?.QuestionText != null && assignment.Question?.QuestionText.Length > 50 ? assignment.Question?.QuestionText.Substring(0, 50) + "..." : assignment.Question?.QuestionText ?? "")
                                                 </small>
                                             </td>
                                             <td>

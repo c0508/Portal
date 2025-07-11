@@ -69,7 +69,7 @@ else
                         
                         <div class="row text-muted small">
                             <div class="col-6">
-                                <i class="bi bi-building"></i> @campaign.Organization?.Name
+                                <i class="bi bi-building"></i> @(campaign.Organization?.Name ?? "Unknown")
                             </div>
                             <div class="col-6">
                                 <i class="bi bi-person"></i> @campaign.CreatedBy?.FirstName @campaign.CreatedBy?.LastName

@@ -90,7 +90,7 @@ public class CampaignController : BaseController
                         .ThenInclude(qv => qv.Questionnaire)
                 .Include(c => c.Assignments.Where(a => a.TargetOrganizationId == CurrentOrganizationId))
                     .ThenInclude(ca => ca.LeadResponder)
-                .Where(c => c.Id == id && c.Assignments.Any(a => a.TargetOrganizationId == CurrentOrganizationId))
+                .Where(c => c.Id == id!.Value && c.Assignments.Any(a => a.TargetOrganizationId == CurrentOrganizationId))
                 .FirstOrDefaultAsync();
         }
         else
@@ -125,10 +125,13 @@ public class CampaignController : BaseController
             campaign = await campaignQuery.FirstOrDefaultAsync();
         }
 
-        if (campaign == null || id == null) return NotFound();
+        if (campaign == null) return NotFound();
 
         // Set campaign-specific branding context
-        await SetBrandingContextAsync(campaignId: id.Value);
+        if (id.HasValue)
+        {
+            await SetBrandingContextAsync(campaignId: id.Value);
+        }
 
         // Pass additional data to view
         ViewBag.CanCloseCampaign = CanCloseCampaign(campaign);
@@ -793,7 +796,7 @@ public class CampaignController : BaseController
                 {
                     Id = u.Id,
                     DisplayName = $"{u.FirstName} {u.LastName}",
-                    Email = u.Email
+                    Email = u.Email ?? ""
                 }).ToListAsync();
         }
     }
@@ -1153,7 +1156,7 @@ public class CampaignController : BaseController
                 {
                     Id = u.Id,
                     DisplayName = $"{u.FirstName} {u.LastName}",
-                    Email = u.Email
+                    Email = u.Email ?? ""
                 }).ToListAsync();
         }
     }
@@ -1475,7 +1478,7 @@ public class CampaignController : BaseController
             .FirstOrDefault()?.CreatedAt;
     }
 
-    private async Task<List<DailyProgressViewModel>> BuildDailyProgressAsync(List<CampaignAssignment> assignments)
+    private Task<List<DailyProgressViewModel>> BuildDailyProgressAsync(List<CampaignAssignment> assignments)
     {
         var last30Days = Enumerable.Range(0, 30)
             .Select(i => DateTime.Now.Date.AddDays(-i))
@@ -1507,7 +1510,7 @@ public class CampaignController : BaseController
             });
         }
 
-        return dailyProgress;
+        return Task.FromResult(dailyProgress);
     }
 
     private List<WeeklyProgressViewModel> BuildWeeklyProgress(List<CampaignAssignment> assignments)
@@ -1633,7 +1636,7 @@ public class CampaignController : BaseController
 
             // Get total responders (including question assignments)
             var totalResponders = await _context.QuestionAssignments
-                .Where(qa => companyAssignments.Select(ca => ca.Id).Contains(qa.CampaignAssignmentId))
+                .Where(qa => companyAssignments.Select(ca => ca.Id).Contains(qa.CampaignAssignmentId) && qa.AssignedUserId != null)
                 .Select(qa => qa.AssignedUserId)
                 .Distinct()
                 .CountAsync();
@@ -1770,7 +1773,7 @@ public class CampaignController : BaseController
             {
                 UserId = leadResponder.Id,
                 UserName = $"{leadResponder.FirstName} {leadResponder.LastName}",
-                UserEmail = leadResponder.Email,
+                UserEmail = leadResponder.Email ?? "",
                 OrganizationName = organization?.Name ?? "Unknown",
                 OrganizationId = organization?.Id ?? 0,
                 UserRole = "User", // TODO: Load user roles if needed

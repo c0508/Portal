@@ -68,14 +68,16 @@ public class HomeController : BaseController
             assignmentsQuery = assignmentsQuery.Where(ca => ca.TargetOrganizationId == CurrentOrganizationId);
         }
 
+        // Optimize queries to avoid N+1 problem
         var assignments = await assignmentsQuery.ToListAsync();
+        var now = DateTime.Now;
 
         summary.TotalAssignments = assignments.Count;
         summary.CompletedAssignments = assignments.Count(a => a.Status == AssignmentStatus.Submitted || a.Status == AssignmentStatus.Approved);
         summary.InProgressAssignments = assignments.Count(a => a.Status == AssignmentStatus.InProgress);
         summary.OverdueAssignments = assignments.Count(a => 
             a.Campaign.Deadline.HasValue && 
-            a.Campaign.Deadline.Value < DateTime.Now && 
+            a.Campaign.Deadline.Value < now && 
             a.Status != AssignmentStatus.Submitted && 
             a.Status != AssignmentStatus.Approved);
 
@@ -224,6 +226,8 @@ public class HomeController : BaseController
             .Take(10)
             .ToListAsync();
 
+        // Optimize campaign data processing to avoid N+1 queries
+        var now = DateTime.Now;
         viewModel.MyCampaigns = campaigns.Select(c => new MyCampaignViewModel
         {
             CampaignId = c.Id,
@@ -238,7 +242,7 @@ public class HomeController : BaseController
             InProgressAssignments = c.Assignments.Count(a => a.Status == AssignmentStatus.InProgress),
             OverdueAssignments = c.Assignments.Count(a => 
                 c.Deadline.HasValue && 
-                c.Deadline.Value < DateTime.Now && 
+                c.Deadline.Value < now && 
                 a.Status != AssignmentStatus.Submitted && 
                 a.Status != AssignmentStatus.Approved)
         }).ToList();

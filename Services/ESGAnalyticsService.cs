@@ -304,11 +304,11 @@ public class ESGAnalyticsService : IESGAnalyticsService
         return await CalculateQuantitativeBenchmarksAsync(assignments);
     }
 
-    private async Task<Dictionary<string, int>> CalculateSectorBreakdownAsync(List<CampaignAssignment> assignments)
+    private Task<Dictionary<string, int>> CalculateSectorBreakdownAsync(List<CampaignAssignment> assignments)
     {
-        return assignments
+        return Task.FromResult(assignments
             .GroupBy(a => GetCompanySector(a))
-            .ToDictionary(g => g.Key, g => g.Count());
+            .ToDictionary(g => g.Key, g => g.Count()));
     }
 
     private async Task<List<ESGTopPerformerViewModel>> IdentifyTopPerformersAsync(List<CampaignAssignment> assignments, int count)

@@ -5,6 +5,7 @@ using ESGPlatform.Data;
 using ESGPlatform.Models.Entities;
 using ESGPlatform.Models.ViewModels;
 using ESGPlatform.Services;
+using System.Text.Json;
 
 namespace ESGPlatform.Controllers
 {
@@ -60,6 +61,15 @@ namespace ESGPlatform.Controllers
         {
             var model = new QuestionnaireCreateViewModel();
             
+            // Debug logging for GET request
+            Console.WriteLine($"=== GET CREATE DEBUG ===");
+            Console.WriteLine($"TempData ImportedQuestions null: {TempData["ImportedQuestions"] == null}");
+            if (TempData["ImportedQuestions"] != null)
+            {
+                Console.WriteLine($"TempData ImportedQuestions: {TempData["ImportedQuestions"]}");
+            }
+            Console.WriteLine($"=== END GET DEBUG ===");
+            
             // Load available questionnaires for copying
             model.AvailableQuestionnaires = await _context.Questionnaires
                 .Where(q => q.OrganizationId == CurrentOrganizationId)
@@ -82,6 +92,17 @@ namespace ESGPlatform.Controllers
         [Authorize(Policy = "OrgAdminOrHigher")]
         public async Task<IActionResult> Create(QuestionnaireCreateViewModel model, string action = "create")
         {
+            // Debug logging for form submission
+            Console.WriteLine($"=== FORM SUBMISSION DEBUG ===");
+            Console.WriteLine($"Action: {action}");
+            Console.WriteLine($"ImportFromExcel: {model.ImportFromExcel}");
+            Console.WriteLine($"ExcelFile null: {model.ExcelFile == null}");
+            Console.WriteLine($"ImportedQuestions count: {model.ImportedQuestions.Count}");
+            Console.WriteLine($"TempData ImportedQuestions null: {TempData["ImportedQuestions"] == null}");
+            Console.WriteLine($"ModelState.IsValid: {ModelState.IsValid}");
+            Console.WriteLine($"ModelState errors: {string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage))}");
+            Console.WriteLine($"=== END DEBUG ===");
+            
             // Handle Excel import preview
             if (action == "preview" && model.ImportFromExcel && model.ExcelFile != null)
             {
@@ -89,6 +110,22 @@ namespace ESGPlatform.Controllers
                 {
                     model.ImportedQuestions = await _excelImportService.ParseExcelFileAsync(model.ExcelFile);
                     TempData["InfoMessage"] = $"Successfully parsed {model.ImportedQuestions.Count} questions from Excel file.";
+                    
+                    // Store imported questions in TempData for the create step
+                    var questionsForStorage = model.ImportedQuestions.Select(q => new
+                    {
+                        q.RowNumber,
+                        q.QuestionText,
+                        q.HelpText,
+                        q.Section,
+                        q.QuestionType,
+                        q.IsRequired,
+                        q.Options,
+                        q.IsPercentage,
+                        q.Unit,
+                        ValidationErrors = string.Join("|", q.ValidationErrors)
+                    }).ToList();
+                    TempData["ImportedQuestions"] = JsonSerializer.Serialize(questionsForStorage);
                     
                     // Check for validation errors
                     var errorCount = model.ImportedQuestions.Count(q => !q.IsValid);
@@ -122,12 +159,57 @@ namespace ESGPlatform.Controllers
                     // Copy from existing questionnaire
                     questionnaire = await CopyQuestionnaireAsync(model.SourceQuestionnaireId.Value, model);
                 }
-                else if (model.ImportFromExcel && model.ExcelFile != null)
+                else if (model.ImportFromExcel || model.ImportedQuestions.Any() || TempData["ImportedQuestions"] != null)
                 {
-                    // Parse Excel file for creation (re-process the file)
+                    // Handle Excel import - either from file or from previous preview
                     try
                     {
-                        model.ImportedQuestions = await _excelImportService.ParseExcelFileAsync(model.ExcelFile);
+                        // Debug logging
+                        Console.WriteLine($"ImportFromExcel: {model.ImportFromExcel}");
+                        Console.WriteLine($"ExcelFile null: {model.ExcelFile == null}");
+                        Console.WriteLine($"ImportedQuestions count: {model.ImportedQuestions.Count}");
+                        Console.WriteLine($"TempData ImportedQuestions null: {TempData["ImportedQuestions"] == null}");
+                        
+                        // If we have a file, parse it; otherwise use existing imported questions or retrieve from TempData
+                        if (model.ExcelFile != null)
+                        {
+                            model.ImportedQuestions = await _excelImportService.ParseExcelFileAsync(model.ExcelFile);
+                        }
+                        else if (TempData["ImportedQuestions"] != null)
+                        {
+                            // Retrieve imported questions from TempData
+                            var importedQuestionsJson = TempData["ImportedQuestions"].ToString();
+                            if (!string.IsNullOrEmpty(importedQuestionsJson))
+                            {
+                                try
+                                {
+                                    var storedQuestions = JsonSerializer.Deserialize<List<JsonElement>>(importedQuestionsJson);
+                                    if (storedQuestions != null)
+                                    {
+                                        model.ImportedQuestions = storedQuestions.Select(q => new ExcelQuestionPreviewViewModel
+                                        {
+                                            RowNumber = q.GetProperty("RowNumber").GetInt32(),
+                                            QuestionText = q.GetProperty("QuestionText").GetString() ?? "",
+                                            HelpText = q.TryGetProperty("HelpText", out var helpText) ? helpText.GetString() : null,
+                                            Section = q.TryGetProperty("Section", out var section) ? section.GetString() : null,
+                                            QuestionType = q.GetProperty("QuestionType").GetString() ?? "",
+                                            IsRequired = q.GetProperty("IsRequired").GetBoolean(),
+                                            Options = q.TryGetProperty("Options", out var options) ? options.GetString() : null,
+                                            IsPercentage = q.GetProperty("IsPercentage").GetBoolean(),
+                                            Unit = q.TryGetProperty("Unit", out var unit) ? unit.GetString() : null,
+                                            ValidationErrors = q.GetProperty("ValidationErrors").GetString()?.Split('|', StringSplitOptions.RemoveEmptyEntries).ToList() ?? new List<string>()
+                                        }).ToList();
+                                        Console.WriteLine($"Retrieved {model.ImportedQuestions.Count} questions from TempData");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Error deserializing TempData: {ex.Message}");
+                                    model.ImportedQuestions = new List<ExcelQuestionPreviewViewModel>();
+                                }
+                            }
+                        }
+                        
                         var validQuestions = model.ImportedQuestions.Where(q => q.IsValid).ToList();
                         
                         if (!validQuestions.Any())
@@ -642,6 +724,8 @@ namespace ESGPlatform.Controllers
 
         private async Task<Questionnaire> CreateQuestionnaireFromExcelAsync(QuestionnaireCreateViewModel model)
         {
+            Console.WriteLine($"CreateQuestionnaireFromExcelAsync called with {model.ImportedQuestions.Count} imported questions");
+            
             // Create new questionnaire
             var questionnaire = new Questionnaire
             {
@@ -675,13 +759,20 @@ namespace ESGPlatform.Controllers
 
             // Create questions from imported data
             var displayOrder = 1;
-            foreach (var importedQuestion in model.ImportedQuestions.Where(q => q.IsValid))
+            var validQuestions = model.ImportedQuestions.Where(q => q.IsValid).ToList();
+            Console.WriteLine($"Processing {validQuestions.Count} valid questions out of {model.ImportedQuestions.Count} total");
+            
+            foreach (var importedQuestion in validQuestions)
             {
                 // Get question type master by code
                 var questionTypeMaster = await _context.QuestionTypes
                     .FirstOrDefaultAsync(qt => qt.Code == importedQuestion.QuestionType);
 
-                if (questionTypeMaster == null) continue;
+                if (questionTypeMaster == null)
+                {
+                    Console.WriteLine($"Question type master not found for: {importedQuestion.QuestionType}");
+                    continue;
+                }
 
                 // Map question type string to enum
                 Enum.TryParse<QuestionType>(importedQuestion.QuestionType, out var questionTypeEnum);
@@ -705,9 +796,11 @@ namespace ESGPlatform.Controllers
                 };
 
                 _context.Add(question);
+                Console.WriteLine($"Added question: {importedQuestion.QuestionText}");
             }
 
             await _context.SaveChangesAsync();
+            Console.WriteLine($"Created questionnaire with {displayOrder - 1} questions");
             return questionnaire;
         }
 

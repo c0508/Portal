@@ -9,7 +9,7 @@ public interface IBrandingService
     Task<BrandingContext> GetBrandingContextAsync(string userId, int? campaignId = null, int? organizationId = null);
     Task<BrandingContext> GetDefaultBrandingAsync(int organizationId);
     Task<BrandingContext> GetCampaignBrandingAsync(int campaignId);
-    Task<BrandingContext> GetPrimaryRelationshipBrandingAsync(int supplierOrganizationId);
+    Task<BrandingContext?> GetPrimaryRelationshipBrandingAsync(int supplierOrganizationId);
 }
 
 public class BrandingService : IBrandingService
@@ -27,7 +27,8 @@ public class BrandingService : IBrandingService
     {
         try
         {
-            _logger.LogInformation("Getting branding context for user {UserId}, campaignId: {CampaignId}, organizationId: {OrganizationId}", userId, campaignId, organizationId);
+            _logger.LogInformation("Getting branding context for user {UserIdHash}, campaignId: {CampaignId}, organizationId: {OrganizationId}", 
+                HashUserId(userId), campaignId, organizationId);
             
             var user = await _context.Users
                 .Include(u => u.Organization)
@@ -39,7 +40,8 @@ public class BrandingService : IBrandingService
                 return GetFallbackBranding();
             }
 
-            _logger.LogInformation("Found user {UserId} with organization {OrganizationId} ({OrganizationName})", userId, user.OrganizationId, user.Organization?.Name);
+            _logger.LogInformation("Found user {UserIdHash} with organization {OrganizationId} ({OrganizationName})", 
+                HashUserId(userId), user.OrganizationId, user.Organization?.Name);
 
             // If specific campaign context is provided
             if (campaignId.HasValue)
@@ -54,7 +56,7 @@ public class BrandingService : IBrandingService
             }
 
             // For supplier organizations, check if they have a primary relationship
-            if (user.Organization.IsSupplierOrganization)
+            if (user.Organization?.IsSupplierOrganization == true)
             {
                 var primaryBranding = await GetPrimaryRelationshipBrandingAsync(user.OrganizationId);
                 if (primaryBranding != null)
@@ -127,7 +129,7 @@ public class BrandingService : IBrandingService
         };
     }
 
-    public async Task<BrandingContext> GetPrimaryRelationshipBrandingAsync(int supplierOrganizationId)
+    public async Task<BrandingContext?> GetPrimaryRelationshipBrandingAsync(int supplierOrganizationId)
     {
         var primaryRelationship = await _context.OrganizationRelationships
             .Include(or => or.PlatformOrganization)
@@ -175,6 +177,19 @@ public class BrandingService : IBrandingService
             SourceId = 0
         };
     }
+
+    /// <summary>
+    /// Creates a hash of the user ID for logging purposes to avoid exposing sensitive data
+    /// </summary>
+    private static string HashUserId(string userId)
+    {
+        if (string.IsNullOrEmpty(userId))
+            return "null";
+            
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(userId));
+        return Convert.ToBase64String(hashBytes).Substring(0, 8); // First 8 characters of hash
+    }
 }
 
 public class BrandingContext
@@ -197,7 +212,7 @@ public class BrandingContext
     {
         var primaryRgb = HexToRgb(PrimaryColor);
         var secondaryRgb = HexToRgb(SecondaryColor);
-        var accentRgb = HexToRgb(AccentColor);
+        var accentRgb = HexToRgb(AccentColor ?? SecondaryColor);
         
         return $@"
             --brand-primary: {PrimaryColor};

@@ -7,6 +7,11 @@ namespace ESGPlatform.Services
 {
     public class ExcelImportService : IExcelImportService
     {
+        // Security configuration
+        private const long MaxExcelFileSizeBytes = 5 * 1024 * 1024; // 5MB
+        private const int MaxRows = 1000; // Prevent DoS with large files
+        private const int MaxColumns = 20; // Prevent DoS with wide files
+        
         private readonly Dictionary<string, string> _questionTypeMapping = new()
         {
             { "text", "Text" },
@@ -31,6 +36,13 @@ namespace ESGPlatform.Services
                 throw new ArgumentException("File is empty or null");
             }
 
+            // Security validation
+            var validationResult = ValidateExcelFile(file);
+            if (!validationResult.IsValid)
+            {
+                throw new ArgumentException(validationResult.ErrorMessage);
+            }
+
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
             using var stream = new MemoryStream();
@@ -42,6 +54,23 @@ namespace ESGPlatform.Services
             if (worksheet == null)
             {
                 throw new ArgumentException("Excel file contains no worksheets");
+            }
+
+            // Validate worksheet dimensions to prevent DoS
+            var dimension = worksheet.Dimension;
+            if (dimension == null)
+            {
+                throw new ArgumentException("Excel file is empty");
+            }
+
+            if (dimension.Rows > MaxRows)
+            {
+                throw new ArgumentException($"Excel file contains too many rows. Maximum allowed: {MaxRows}");
+            }
+
+            if (dimension.Columns > MaxColumns)
+            {
+                throw new ArgumentException($"Excel file contains too many columns. Maximum allowed: {MaxColumns}");
             }
 
             // Expected columns: Question Text, Help Text, Section, Question Type, Required, Options
@@ -81,7 +110,7 @@ namespace ESGPlatform.Services
                 {
                     RowNumber = row,
                     QuestionText = questionText,
-                    HelpText = worksheet.Cells[row, 2].Value?.ToString()?.Trim(),
+                    HelpText = TruncateToMaxLength(worksheet.Cells[row, 2].Value?.ToString()?.Trim(), 500),
                     Section = worksheet.Cells[row, 3].Value?.ToString()?.Trim(),
                     QuestionType = worksheet.Cells[row, 4].Value?.ToString()?.Trim() ?? "",
                     IsRequired = ParseBooleanValue(worksheet.Cells[row, 5].Value?.ToString()),
@@ -326,6 +355,108 @@ namespace ESGPlatform.Services
             // Excel stores multi-line content with actual line breaks (\r\n, \n, or \r)
             // We need to normalize them to \n for consistent processing
             return value.Replace("\r\n", "\n").Replace("\r", "\n").Trim();
+        }
+
+        private static string? TruncateToMaxLength(string? value, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return value;
+
+            if (value.Length <= maxLength)
+                return value;
+
+            // Truncate and add ellipsis to indicate truncation
+            return value.Substring(0, maxLength - 3) + "...";
+        }
+
+        private FileValidationResult ValidateExcelFile(IFormFile file)
+        {
+            if (file == null)
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "No file provided"
+                };
+            }
+
+            if (file.Length == 0)
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "File is empty"
+                };
+            }
+
+            if (file.Length > MaxExcelFileSizeBytes)
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = $"File size exceeds maximum allowed size of {MaxExcelFileSizeBytes / (1024 * 1024)}MB"
+                };
+            }
+
+            if (string.IsNullOrEmpty(file.FileName))
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Invalid filename"
+                };
+            }
+
+            // Check for path traversal in filename
+            if (file.FileName.Contains("..") || file.FileName.Contains("/") || file.FileName.Contains("\\"))
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Invalid filename"
+                };
+            }
+
+            // Validate file extension
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".xlsx", ".xls" };
+            
+            if (!allowedExtensions.Contains(extension))
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Only Excel files (.xlsx, .xls) are allowed"
+                };
+            }
+
+            // Validate content type
+            var allowedContentTypes = new[] 
+            {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel",
+                "application/octet-stream" // Some systems send this for Excel files
+            };
+
+            if (!allowedContentTypes.Contains(file.ContentType.ToLowerInvariant()))
+            {
+                return new FileValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Invalid file type"
+                };
+            }
+
+            return new FileValidationResult
+            {
+                IsValid = true
+            };
+        }
+
+        private class FileValidationResult
+        {
+            public bool IsValid { get; set; }
+            public string? ErrorMessage { get; set; }
         }
     }
 } 
