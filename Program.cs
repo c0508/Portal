@@ -93,6 +93,7 @@ builder.Services.AddScoped<IResponseWorkflowService, ResponseWorkflowService>();
 builder.Services.AddScoped<IESGAnalyticsService, ESGAnalyticsService>();
 builder.Services.AddScoped<IFlexibleAnalyticsService, FlexibleAnalyticsService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IPdfAnalysisService, PdfAnalysisService>();
 
 // Configure authorization policies
 builder.Services.AddAuthorization(options =>
