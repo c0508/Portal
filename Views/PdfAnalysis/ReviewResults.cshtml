@@ -1,0 +1,311 @@
+@model ESGPlatform.Models.ViewModels.PdfReviewViewModel
+@{
+    ViewData["Title"] = "PDF Analysis Results";
+}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="bi bi-search me-2"></i>
+                        PDF Analysis Results
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Analysis Summary -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">File Analyzed</h6>
+                                    <p class="card-text">@Model.AnalysisResult.FileName</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Questions Matched</h6>
+                                    <p class="card-text display-6">@Model.AnalysisResult.MatchedQuestions / @Model.AnalysisResult.TotalQuestions</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Average Confidence</h6>
+                                    <p class="card-text display-6">@Model.AnalysisResult.AverageConfidence:P0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-secondary text-white">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Analysis Time</h6>
+                                    <p class="card-text">@Model.AnalysisResult.AnalyzedAt.ToString("HH:mm:ss")</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2 mb-4">
+                        <button type="button" class="btn btn-success" id="selectAllBtn">
+                            <i class="bi bi-check-all me-2"></i>
+                            Select All Valid
+                        </button>
+                        <button type="button" class="btn btn-warning" id="selectHighConfidenceBtn">
+                            <i class="bi bi-check-circle me-2"></i>
+                            Select High Confidence (>80%)
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="clearSelectionBtn">
+                            <i class="bi bi-x-circle me-2"></i>
+                            Clear Selection
+                        </button>
+                        <a asp-action="DownloadReport" asp-route-questionnaireId="@Model.QuestionnaireId" 
+                           class="btn btn-outline-primary">
+                            <i class="bi bi-download me-2"></i>
+                            Download Report
+                        </a>
+                    </div>
+
+                    <!-- Results Table -->
+                    <form asp-action="ApplyResults" method="post">
+                        <input type="hidden" asp-for="QuestionnaireId" />
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;">
+                                            <input type="checkbox" id="selectAll" class="form-check-input" />
+                                        </th>
+                                        <th style="width: 100px;">Status</th>
+                                        <th>Question</th>
+                                        <th>Extracted Answer</th>
+                                        <th style="width: 120px;">Confidence</th>
+                                        <th style="width: 100px;">Source Page</th>
+                                        <th style="width: 200px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @for (int i = 0; i < Model.AnalysisResult.Matches.Count; i++)
+                                    {
+                                        var match = Model.AnalysisResult.Matches[i];
+                                        <tr class="@(match.IsValid ? "" : "table-danger")">
+                                            <td>
+                                                <input type="checkbox" name="SelectedMatchIds" value="@match.QuestionId" 
+                                                       class="form-check-input match-checkbox" 
+                                                       @(match.IsValid && match.ConfidenceScore >= 0.8 ? "checked" : "") />
+                                            </td>
+                                            <td>
+                                                <i class="@(match.IsValid ? "bi-check-circle text-success" : "bi-x-circle text-danger")" title="@(match.IsValid ? "Valid" : "Invalid")"></i>
+                                            </td>
+                                            <td>
+                                                <strong>@match.QuestionText</strong>
+                                                @if (!match.IsValid)
+                                                {
+                                                    <div class="small text-danger">
+                                                        @string.Join(", ", match.ValidationErrors)
+                                                    </div>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="text-truncate" style="max-width: 300px;" title="@match.ExtractedAnswer">
+                                                    @match.ExtractedAnswer
+                                                </div>
+                                                @if (!string.IsNullOrEmpty(match.Reasoning))
+                                                {
+                                                    <small class="text-muted d-block">
+                                                        <i class="bi bi-lightbulb me-1"></i>
+                                                        @match.Reasoning
+                                                    </small>
+                                                }
+                                            </td>
+                                            <td>
+                                                <span class="badge @(match.ConfidenceScore >= 0.8 ? "bg-success" : match.ConfidenceScore >= 0.6 ? "bg-warning" : match.ConfidenceScore >= 0.4 ? "bg-info" : "bg-danger")">
+                                                    @(match.ConfidenceScore.ToString("P0"))
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if (match.SourcePage.HasValue)
+                                                {
+                                                    <span class="badge bg-secondary">Page @match.SourcePage</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button type="button" class="btn btn-outline-info btn-sm" 
+                                                            onclick="showDetails(@i)">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-warning btn-sm" 
+                                                            onclick="editAnswer(@i)">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary" id="applyBtn">
+                                <i class="bi bi-check-circle me-2"></i>
+                                Apply Selected Answers
+                            </button>
+                            <a asp-action="Analyze" asp-route-questionnaireId="@Model.QuestionnaireId" 
+                               class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-2"></i>
+                                Back to Analysis
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Answer Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailsModalBody">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            // Select all functionality
+            $('#selectAll').change(function() {
+                $('.match-checkbox').prop('checked', $(this).is(':checked'));
+            });
+            
+            // Update select all when individual checkboxes change
+            $('.match-checkbox').change(function() {
+                var totalCheckboxes = $('.match-checkbox').length;
+                var checkedCheckboxes = $('.match-checkbox:checked').length;
+                $('#selectAll').prop('checked', totalCheckboxes === checkedCheckboxes);
+            });
+            
+            // Select all valid answers
+            $('#selectAllBtn').click(function() {
+                $('.match-checkbox').each(function() {
+                    var row = $(this).closest('tr');
+                    if (!row.hasClass('table-danger')) {
+                        $(this).prop('checked', true);
+                    }
+                });
+                $('#selectAll').prop('checked', $('.match-checkbox:checked').length === $('.match-checkbox').length);
+            });
+            
+            // Select high confidence answers
+            $('#selectHighConfidenceBtn').click(function() {
+                $('.match-checkbox').each(function() {
+                    var row = $(this).closest('tr');
+                    var confidenceBadge = row.find('.badge');
+                    var confidenceText = confidenceBadge.text();
+                    var confidence = parseFloat(confidenceText.replace('%', '')) / 100;
+                    
+                    if (confidence >= 0.8 && !row.hasClass('table-danger')) {
+                        $(this).prop('checked', true);
+                    }
+                });
+            });
+            
+            // Clear selection
+            $('#clearSelectionBtn').click(function() {
+                $('.match-checkbox').prop('checked', false);
+                $('#selectAll').prop('checked', false);
+            });
+            
+            // Show loading state for apply button
+            $('#applyBtn').click(function() {
+                var btn = $(this);
+                var originalText = btn.html();
+                
+                btn.prop('disabled', true);
+                btn.html('<i class="bi bi-hourglass-split me-2"></i>Applying...');
+                
+                setTimeout(function() {
+                    btn.prop('disabled', false);
+                    btn.html(originalText);
+                }, 5000);
+            });
+        });
+        
+        function showDetails(index) {
+            var matches = @Html.Raw(Json.Serialize(Model.AnalysisResult.Matches));
+            var match = matches[index];
+            
+            var modalContent = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Question</h6>
+                        <p>${match.questionText}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Extracted Answer</h6>
+                        <p>${match.extractedAnswer || 'No answer found'}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h6>Confidence Score</h6>
+                        <span class="badge ${match.confidenceScore >= 0.8 ? 'bg-success' : match.confidenceScore >= 0.6 ? 'bg-warning' : 'bg-danger'}">
+                            ${(match.confidenceScore * 100).toFixed(0)}%
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Source Page</h6>
+                        <p>${match.sourcePage || 'Not specified'}</p>
+                    </div>
+                </div>
+                ${match.reasoning ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>AI Reasoning</h6>
+                        <p class="text-muted">${match.reasoning}</p>
+                    </div>
+                </div>
+                ` : ''}
+                ${match.sourceText ? `
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Source Text</h6>
+                        <div class="bg-light p-3 rounded">
+                            <small>${match.sourceText}</small>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            $('#detailsModalBody').html(modalContent);
+            $('#detailsModal').modal('show');
+        }
+        
+        function editAnswer(index) {
+            // For now, just show the details modal
+            // In a full implementation, this would open an edit form
+            showDetails(index);
+        }
+    </script>
+} 
