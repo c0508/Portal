@@ -340,3 +340,5 @@ appsettings.local.json
 
 # Ignore environment variable files
 .env 
+#exclude onnx files
+*.onnx
