@@ -642,6 +642,27 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole, string
         builder.Entity<ResponseWorkflow>().HasQueryFilter(rw => 
             _currentOrganizationId == null || rw.Response.Responder.OrganizationId == _currentOrganizationId);
 
+        // Add query filters for entities that have relationships with filtered entities
+        builder.Entity<OrganizationRelationshipAttribute>().HasQueryFilter(ora => 
+            _currentOrganizationId == null || 
+            ora.OrganizationRelationship.PlatformOrganizationId == _currentOrganizationId || 
+            ora.OrganizationRelationship.SupplierOrganizationId == _currentOrganizationId);
+
+        builder.Entity<QuestionAssignmentChange>().HasQueryFilter(qac => 
+            _currentOrganizationId == null || qac.CampaignAssignment.TargetOrganizationId == _currentOrganizationId);
+
+        builder.Entity<QuestionChange>().HasQueryFilter(qc => 
+            _currentOrganizationId == null || qc.ChangedBy.OrganizationId == _currentOrganizationId);
+
+        builder.Entity<QuestionDependency>().HasQueryFilter(qd => 
+            _currentOrganizationId == null || qd.CreatedBy.OrganizationId == _currentOrganizationId);
+
+        builder.Entity<QuestionQuestionAttribute>().HasQueryFilter(qqa => 
+            _currentOrganizationId == null || qqa.Question.Questionnaire.OrganizationId == _currentOrganizationId);
+
+        builder.Entity<ResponseStatusHistory>().HasQueryFilter(rsh => 
+            _currentOrganizationId == null || rsh.ChangedBy.OrganizationId == _currentOrganizationId);
+
         // Configure decimal precision for NumericValue to prevent truncation warnings
         builder.Entity<Response>()
             .Property(r => r.NumericValue)

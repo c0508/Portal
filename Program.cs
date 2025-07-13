@@ -4,8 +4,26 @@ using ESGPlatform.Middleware;
 using ESGPlatform.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using DotNetEnv;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.Server.IIS.Core;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Load environment variables from .env file
+DotNetEnv.Env.Load();
+
+// Add Kestrel configuration for both HTTP and HTTPS (localhost only)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenLocalhost(5000); // HTTP
+    options.ListenLocalhost(5001, listenOptions =>
+    {
+        listenOptions.UseHttps();
+    });
+});
 
 // Add services to the container
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -21,11 +39,7 @@ if (!string.IsNullOrEmpty(sqlPassword))
     connectionString = connectionString.Replace("${SQL_PASSWORD}", sqlPassword);
 }
 
-// Only log connection string in development environment
-if (builder.Environment.IsDevelopment())
-{
-    Console.WriteLine($"Connection String: {connectionString}");
-}
+// Connection string logging removed for security
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
@@ -74,8 +88,25 @@ builder.Services.ConfigureApplicationCookie(options =>
 // Add MVC services
 builder.Services.AddControllersWithViews();
 
+// Configure form options for file uploads
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50MB
+    options.ValueLengthLimit = int.MaxValue;
+    options.ValueCountLimit = int.MaxValue;
+    options.KeyLengthLimit = int.MaxValue;
+    options.BufferBody = true;
+    options.BufferBodyLengthLimit = 50 * 1024 * 1024; // 50MB
+});
+
 // Add HttpContextAccessor for multi-tenant context
 builder.Services.AddHttpContextAccessor();
+
+// Add HttpClient for external API calls
+builder.Services.AddHttpClient();
+
+// Add memory cache for PDF text caching
+builder.Services.AddMemoryCache();
 
 // Add custom services
 builder.Services.AddScoped<IBrandingService, BrandingService>();
@@ -94,6 +125,8 @@ builder.Services.AddScoped<IESGAnalyticsService, ESGAnalyticsService>();
 builder.Services.AddScoped<IFlexibleAnalyticsService, FlexibleAnalyticsService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IPdfAnalysisService, PdfAnalysisService>();
+builder.Services.AddScoped<IPdfTextExtractor, PdfPigTextExtractor>();
+builder.Services.AddScoped<IPdfTextCacheService, PdfTextCacheService>();
 
 // Configure authorization policies
 builder.Services.AddAuthorization(options =>
@@ -116,6 +149,33 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
+}
+else
+{
+    // Add detailed error logging for development
+    app.Use(async (context, next) =>
+    {
+        try
+        {
+            await next();
+        }
+        catch (Exception ex)
+        {
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "Unhandled exception in request pipeline for {Method} {Path}", 
+                context.Request.Method, context.Request.Path);
+            throw;
+        }
+        
+        // Log 400 errors specifically
+        if (context.Response.StatusCode == 400)
+        {
+            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("400 Bad Request for {Method} {Path}. Content-Type: {ContentType}, Content-Length: {ContentLength}", 
+                context.Request.Method, context.Request.Path, 
+                context.Request.ContentType, context.Request.ContentLength);
+        }
+    });
 }
 
 app.UseHttpsRedirection();

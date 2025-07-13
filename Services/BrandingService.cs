@@ -67,7 +67,7 @@ public class BrandingService : IBrandingService
 
             // Default to user's organization branding
             var brandingContext = await GetDefaultBrandingAsync(user.OrganizationId);
-            _logger.LogInformation("Returning branding context: {OrganizationName}, {PrimaryColor}, {LogoUrl}", brandingContext.OrganizationName, brandingContext.PrimaryColor, brandingContext.LogoUrl);
+            //_logger.LogInformation("Returning branding context: {OrganizationName}, {PrimaryColor}, {LogoUrl}", brandingContext.OrganizationName, brandingContext.PrimaryColor, brandingContext.LogoUrl);
             return brandingContext;
         }
         catch (Exception ex)

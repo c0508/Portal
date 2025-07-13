@@ -1,179 +1,57 @@
-@model ESGPlatform.Models.ViewModels.PdfAnalysisViewModel
 @{
-    ViewData["Title"] = "PDF Analysis";
+    ViewData["Title"] = "Minimal PDF Text Extractor with Embeddings";
 }
 
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h4 class="card-title mb-0">
-                        <i class="bi bi-file-earmark-pdf me-2"></i>
-                        PDF Analysis - @Model.QuestionnaireTitle
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <form asp-action="Analyze" method="post" enctype="multipart/form-data">
-                                <input type="hidden" asp-for="QuestionnaireId" />
-                                <input type="hidden" asp-for="QuestionnaireTitle" />
-                                
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle me-2"></i>
-                                    <strong>AI-Powered PDF Analysis</strong><br>
-                                    Upload a PDF report (annual report, sustainability report, etc.) and our AI will automatically extract answers to questionnaire questions.
-                                </div>
+<h2>Minimal PDF Text Extractor with Embeddings</h2>
 
-                                <div class="mb-4">
-                                    <label asp-for="PdfFile" class="form-label fw-semibold">Select PDF File</label>
-                                    <div class="input-group">
-                                        <input type="file" class="form-control" asp-for="PdfFile" accept=".pdf" />
-                                        <button class="btn btn-outline-secondary" type="button" id="clearFile">
-                                            <i class="bi bi-x"></i>
-                                        </button>
-                                    </div>
-                                    <div class="form-text">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        Maximum file size: 10MB. Supported formats: PDF only.
-                                    </div>
-                                    <span asp-validation-for="PdfFile" class="text-danger"></span>
-                                </div>
-
-                                <div class="mb-4">
-                                    <label asp-for="AnalysisNotes" class="form-label fw-semibold">Analysis Notes (Optional)</label>
-                                    <textarea asp-for="AnalysisNotes" class="form-control" rows="3" 
-                                              placeholder="Add any notes about the PDF content or specific sections to focus on..."></textarea>
-                                    <div class="form-text">
-                                        <i class="bi bi-lightbulb me-1"></i>
-                                        Help the AI by providing context about the document type or key sections.
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <h6 class="fw-semibold mb-3">Questionnaire Overview</h6>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="card bg-light">
-                                                <div class="card-body">
-                                                    <h6 class="card-title">Total Questions</h6>
-                                                    <p class="card-text display-6 text-primary">@Model.Questions.Count</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="card bg-light">
-                                                <div class="card-body">
-                                                    <h6 class="card-title">Question Types</h6>
-                                                    <p class="card-text">
-                                                        @{
-                                                            var questionTypes = Model.Questions.GroupBy(q => q.QuestionType)
-                                                                                          .Select(g => $"{g.Key}: {g.Count()}")
-                                                                                          .ToList();
-                                                        }
-                                                        @string.Join(", ", questionTypes)
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary" id="analyzeBtn">
-                                        <i class="bi bi-search me-2"></i>
-                                        Analyze PDF
-                                    </button>
-                                    <a asp-controller="Questionnaire" asp-action="Details" asp-route-id="@Model.QuestionnaireId" 
-                                       class="btn btn-secondary">
-                                        <i class="bi bi-arrow-left me-2"></i>
-                                        Back to Questionnaire
-                                    </a>
-                                </div>
-                            </form>
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">
-                                        <i class="bi bi-lightbulb me-2"></i>
-                                        How It Works
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <ol class="mb-0">
-                                        <li class="mb-2">Upload your PDF report</li>
-                                        <li class="mb-2">AI extracts text and analyzes content</li>
-                                        <li class="mb-2">Matches questions to relevant sections</li>
-                                        <li class="mb-2">Provides confidence scores for each match</li>
-                                        <li class="mb-2">Review and validate extracted answers</li>
-                                        <li>Apply selected answers to questionnaire</li>
-                                    </ol>
-                                </div>
-                            </div>
-                            
-                            <div class="card mt-3">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">
-                                        <i class="bi bi-shield-check me-2"></i>
-                                        Supported Documents
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <ul class="mb-0">
-                                        <li>Annual Reports</li>
-                                        <li>Sustainability Reports</li>
-                                        <li>ESG Reports</li>
-                                        <li>Financial Statements</li>
-                                        <li>Corporate Social Responsibility Reports</li>
-                                        <li>Environmental Impact Reports</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<form asp-action="Analyze" method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label for="pdfFile" class="form-label">Select PDF File</label>
+        <input type="file" class="form-control" id="pdfFile" name="pdfFile" accept=".pdf" />
     </div>
-</div>
+    <div class="mb-3">
+        <label for="question" class="form-label">Question (Optional)</label>
+        <input type="text" class="form-control" id="question" name="question" 
+               placeholder="What were the total scope 2 emissions last year?" 
+               value="@ViewBag.Question" />
+        <div class="form-text">Leave empty to use the default question</div>
+    </div>
+    <button type="submit" class="btn btn-primary">Extract & Find Relevant Chunk</button>
+</form>
 
-@section Scripts {
-    <script>
-        $(document).ready(function() {
-            // Clear file input
-            $('#clearFile').click(function() {
-                $('input[type="file"]').val('');
-            });
-            
-            // Show loading state during analysis
-            $('#analyzeBtn').click(function() {
-                var btn = $(this);
-                var originalText = btn.html();
-                
-                btn.prop('disabled', true);
-                btn.html('<i class="bi bi-hourglass-split me-2"></i>Analyzing...');
-                
-                // Re-enable after a delay (in case of validation errors)
-                setTimeout(function() {
-                    btn.prop('disabled', false);
-                    btn.html(originalText);
-                }, 5000);
-            });
-            
-            // File size validation
-            $('input[type="file"]').change(function() {
-                var file = this.files[0];
-                if (file) {
-                    var maxSize = 10 * 1024 * 1024; // 10MB
-                    if (file.size > maxSize) {
-                        alert('File size must be less than 10MB.');
-                        $(this).val('');
-                    }
-                }
-            });
-        });
-    </script>
+@if (ViewBag.FileName != null)
+{
+    <div class="alert alert-info mt-3">
+        <i class="bi bi-file-earmark-pdf"></i>
+        <strong>Current PDF:</strong> @ViewBag.FileName
+    </div>
+}
+
+@if (ViewBag.Error != null)
+{
+    <div class="alert alert-danger mt-4">Error: @ViewBag.Error</div>
+}
+
+@if (ViewBag.Question != null)
+{
+    <div class="mt-4">
+        <h5>Question:</h5>
+        <pre>@ViewBag.Question</pre>
+    </div>
+}
+
+@if (ViewBag.Answer != null)
+{
+    <div class="mt-4">
+        <h5>Extracted Answer (Number):</h5>
+        <pre>@ViewBag.Answer</pre>
+    </div>
+}
+
+@if (ViewBag.BestChunk != null && !string.IsNullOrEmpty(ViewBag.BestChunk))
+{
+    <div class="mt-4">
+        <h5>Most Relevant 1000-Character Chunk:</h5>
+        <pre>@ViewBag.BestChunk</pre>
+    </div>
 } 

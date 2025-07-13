@@ -192,6 +192,14 @@
 
 @section Scripts {
     <script>
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;')
+                       .replace(/"/g, '&quot;')
+                       .replace(/'/g, '&#039;');
+        }
         $(document).ready(function() {
             // Select all functionality
             $('#selectAll').change(function() {
@@ -254,16 +262,15 @@
         function showDetails(index) {
             var matches = @Html.Raw(Json.Serialize(Model.AnalysisResult.Matches));
             var match = matches[index];
-            
             var modalContent = `
                 <div class="row">
                     <div class="col-md-6">
                         <h6>Question</h6>
-                        <p>${match.questionText}</p>
+                        <p>${escapeHtml(match.questionText)}</p>
                     </div>
                     <div class="col-md-6">
-                        <h6>Extracted Answer</h6>
-                        <p>${match.extractedAnswer || 'No answer found'}</p>
+                        <h6>Extracted Value</h6>
+                        <p class="fw-bold">${escapeHtml(match.extractedAnswer || 'No answer found')}</p>
                     </div>
                 </div>
                 <div class="row mt-3">
@@ -278,21 +285,27 @@
                         <p>${match.sourcePage || 'Not specified'}</p>
                     </div>
                 </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Source Text (Excerpt)</h6>
+                        <div class="bg-light p-3 rounded" style="max-height:200px;overflow:auto;">
+                            <small>${escapeHtml(match.sourceText ? match.sourceText.substring(0, 1000) : 'No source text')}</small>
+                        </div>
+                    </div>
+                </div>
                 ${match.reasoning ? `
                 <div class="row mt-3">
                     <div class="col-12">
                         <h6>AI Reasoning</h6>
-                        <p class="text-muted">${match.reasoning}</p>
+                        <p class="text-muted">${escapeHtml(match.reasoning)}</p>
                     </div>
                 </div>
                 ` : ''}
-                ${match.sourceText ? `
+                ${match.rawAiResponse ? `
                 <div class="row mt-3">
                     <div class="col-12">
-                        <h6>Source Text</h6>
-                        <div class="bg-light p-3 rounded">
-                            <small>${match.sourceText}</small>
-                        </div>
+                        <h6>Debug Info (Raw AI Response)</h6>
+                        <pre class="bg-dark text-white p-2 rounded" style="max-height:300px;overflow:auto;">${escapeHtml(match.rawAiResponse)}</pre>
                     </div>
                 </div>
                 ` : ''}
@@ -303,8 +316,6 @@
         }
         
         function editAnswer(index) {
-            // For now, just show the details modal
-            // In a full implementation, this would open an edit form
             showDetails(index);
         }
     </script>

@@ -11,9 +11,9 @@ namespace ESGPlatform.Models.ViewModels
         public string QuestionnaireTitle { get; set; } = string.Empty;
         public List<Question> Questions { get; set; } = new();
 
-        [Required]
+        // [Required] // Temporarily commented out for testing
         [Display(Name = "PDF File")]
-        public IFormFile? PdfFile { get; set; }
+        public IFormFile? PdfFile { get; set; } = null;
 
         [Display(Name = "Analysis Notes")]
         public string? AnalysisNotes { get; set; }

@@ -3,6 +3,7 @@ using ESGPlatform.Models.Entities;
 using Microsoft.AspNetCore.Http;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Headers;
 
 namespace ESGPlatform.Services
 {
@@ -12,13 +13,28 @@ namespace ESGPlatform.Services
         private readonly HttpClient _httpClient;
         private readonly string _openAiApiKey;
         private readonly string _openAiEndpoint;
+        private readonly IPdfTextExtractor _pdfTextExtractor;
 
-        public PdfAnalysisService(ILogger<PdfAnalysisService> logger, HttpClient httpClient, IConfiguration configuration)
+        public PdfAnalysisService(
+            ILogger<PdfAnalysisService> logger, 
+            HttpClient httpClient, 
+            IConfiguration configuration,
+            IPdfTextExtractor pdfTextExtractor)
         {
             _logger = logger;
             _httpClient = httpClient;
+            _pdfTextExtractor = pdfTextExtractor;
             _openAiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? configuration["OpenAI:ApiKey"] ?? "";
             _openAiEndpoint = configuration["OpenAI:Endpoint"] ?? "https://api.openai.com/v1/chat/completions";
+            
+            if (string.IsNullOrEmpty(_openAiApiKey))
+            {
+                _logger.LogWarning("OpenAI API key is not configured. PDF analysis will use mock responses.");
+            }
+            else
+            {
+                _logger.LogInformation("OpenAI API key is configured. API key length: {Length}", _openAiApiKey.Length);
+            }
         }
 
         public async Task<PdfAnalysisResult> AnalyzePdfAsync(IFormFile pdfFile, int questionnaireId)
@@ -27,57 +43,113 @@ namespace ESGPlatform.Services
             {
                 _logger.LogInformation("Starting PDF analysis for file: {FileName}", pdfFile.FileName);
 
-                // Extract text from PDF
-                var extractedText = await ExtractTextFromPdfAsync(pdfFile);
+                // Extract text from PDF using the new text extractor
+                var extractionResult = await _pdfTextExtractor.ExtractTextAsync(pdfFile);
                 
-                // Create a mock result for now
-                var result = new PdfAnalysisResult
+                if (!extractionResult.IsSuccess)
+                {
+                    _logger.LogError("PDF text extraction failed for file: {FileName}. Error: {Error}", 
+                        pdfFile.FileName, extractionResult.ErrorMessage);
+                    
+                    return new PdfAnalysisResult
+                    {
+                        FileName = pdfFile.FileName,
+                        ExtractedText = "",
+                        AnalyzedAt = DateTime.UtcNow,
+                        TotalQuestions = 0,
+                        MatchedQuestions = 0,
+                        AverageConfidence = 0
+                    };
+                }
+
+                if (string.IsNullOrWhiteSpace(extractionResult.Text))
+                {
+                    _logger.LogWarning("Extracted text is empty for file: {FileName}", pdfFile.FileName);
+                    return new PdfAnalysisResult
+                    {
+                        FileName = pdfFile.FileName,
+                        ExtractedText = "",
+                        AnalyzedAt = DateTime.UtcNow,
+                        TotalQuestions = 0,
+                        MatchedQuestions = 0,
+                        AverageConfidence = 0
+                    };
+                }
+
+                // Log extraction details
+                _logger.LogInformation("PDF text extraction completed for {FileName}. Extracted {TextLength} characters from {PageCount} pages in {ElapsedMs}ms. Requires OCR: {RequiresOcr}", 
+                    pdfFile.FileName, extractionResult.Text.Length, extractionResult.PageCount, extractionResult.ExtractionTimeMs, extractionResult.RequiresOcr);
+
+                // Check if extracted text is suspiciously short
+                if (extractionResult.Text.Length < 50)
+                {
+                    _logger.LogWarning("Extracted text is very short ({Length} chars) for file: {FileName}", extractionResult.Text.Length, pdfFile.FileName);
+                }
+
+                return new PdfAnalysisResult
                 {
                     FileName = pdfFile.FileName,
-                    ExtractedText = extractedText,
+                    ExtractedText = extractionResult.Text,
                     AnalyzedAt = DateTime.UtcNow,
                     TotalQuestions = 0, // Will be set by controller
                     MatchedQuestions = 0, // Will be set by controller
-                    AverageConfidence = 0.0 // Will be set by controller
+                    AverageConfidence = 0 // Will be set by controller
                 };
-
-                _logger.LogInformation("PDF analysis completed for file: {FileName}", pdfFile.FileName);
-                return result;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error analyzing PDF file: {FileName}", pdfFile.FileName);
-                throw;
+                return new PdfAnalysisResult
+                {
+                    FileName = pdfFile.FileName,
+                    ExtractedText = "",
+                    AnalyzedAt = DateTime.UtcNow,
+                    TotalQuestions = 0,
+                    MatchedQuestions = 0,
+                    AverageConfidence = 0
+                };
             }
         }
 
         public async Task<List<QuestionAnswerMatch>> ExtractAnswersAsync(string pdfText, List<Question> questions)
         {
             var matches = new List<QuestionAnswerMatch>();
-
+            
+            // _logger.LogInformation("Starting answer extraction for {QuestionCount} questions.", questions.Count);
+            
             foreach (var question in questions)
             {
                 try
                 {
+                    // _logger.LogInformation("Extracting answer for question {QuestionId} ({QuestionType})", question.Id, question.QuestionType);
+                    
                     var match = await ExtractAnswerForQuestionAsync(question, pdfText);
                     matches.Add(match);
+                    
+                    // _logger.LogInformation("Extracted answer for question {QuestionId}: Confidence={Confidence}, IsValid={IsValid}", 
+                    //     question.Id, match.ConfidenceScore, match.IsValid);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error extracting answer for question {QuestionId}", question.Id);
-                    
-                    // Add a failed match
                     matches.Add(new QuestionAnswerMatch
                     {
                         QuestionId = question.Id,
                         QuestionText = question.QuestionText,
-                        ConfidenceScore = 0.0,
+                        ExtractedAnswer = "Error processing question",
+                        ConfidenceScore = 0,
                         IsValid = false,
-                        ValidationErrors = { "Failed to extract answer" }
+                        ValidationErrors = new List<string> { ex.Message }
                     });
                 }
             }
-
+            
+            var validMatches = matches.Count(m => m.IsValid);
+            var averageConfidence = matches.Any() ? matches.Average(m => m.ConfidenceScore) : 0;
+            
+            // _logger.LogInformation("Answer extraction complete. Valid matches: {ValidCount}/{TotalCount}, Average confidence: {AverageConfidence:F2}", 
+            //     validMatches, matches.Count, averageConfidence);
+            
             return matches;
         }
 
@@ -105,72 +177,58 @@ namespace ESGPlatform.Services
             return Encoding.UTF8.GetBytes(json);
         }
 
-        private async Task<string> ExtractTextFromPdfAsync(IFormFile pdfFile)
-        {
-            // For now, return a placeholder text
-            // In production, you'd use a PDF library like iTextSharp
-            return "This is extracted text from the PDF. In a real implementation, this would contain the actual text content from the PDF file.";
-        }
-
         private async Task<QuestionAnswerMatch> ExtractAnswerForQuestionAsync(Question question, string pdfText)
         {
             try
             {
-                // Try to use real AI if API key is configured
-                if (!string.IsNullOrEmpty(_openAiApiKey))
-                {
-                    var aiAnswer = await GenerateAiAnswerAsync(question, pdfText);
-                    return new QuestionAnswerMatch
-                    {
-                        QuestionId = question.Id,
-                        QuestionText = question.QuestionText,
-                        ExtractedAnswer = aiAnswer.Answer,
-                        ConfidenceScore = aiAnswer.Confidence,
-                        SourceText = aiAnswer.SourceText,
-                        SourcePage = aiAnswer.SourcePage,
-                        Reasoning = aiAnswer.Reasoning,
-                        IsValid = aiAnswer.Confidence > 0.5
-                    };
-                }
-                else
-                {
-                    // Fall back to mock response if no API key
-                    var mockAnswer = await GenerateMockAnswerAsync(question, pdfText);
-                    return new QuestionAnswerMatch
-                    {
-                        QuestionId = question.Id,
-                        QuestionText = question.QuestionText,
-                        ExtractedAnswer = mockAnswer.Answer,
-                        ConfidenceScore = mockAnswer.Confidence,
-                        SourceText = mockAnswer.SourceText,
-                        SourcePage = mockAnswer.SourcePage,
-                        Reasoning = mockAnswer.Reasoning,
-                        IsValid = mockAnswer.Confidence > 0.5
-                    };
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error extracting answer for question {QuestionId}, falling back to mock", question.Id);
+                // _logger.LogInformation("Calling OpenAI for question {QuestionId}", question.Id);
                 
-                // Fall back to mock response on error
-                var mockAnswer = await GenerateMockAnswerAsync(question, pdfText);
+                var aiResponse = await GenerateAiAnswerAsync(question, pdfText);
+                
+                // _logger.LogInformation("OpenAI response for question {QuestionId}: Confidence={Confidence}", question.Id, aiResponse.Confidence);
+                
                 return new QuestionAnswerMatch
                 {
                     QuestionId = question.Id,
                     QuestionText = question.QuestionText,
-                    ExtractedAnswer = mockAnswer.Answer,
-                    ConfidenceScore = mockAnswer.Confidence,
-                    SourceText = mockAnswer.SourceText,
-                    SourcePage = mockAnswer.SourcePage,
-                    Reasoning = mockAnswer.Reasoning,
-                    IsValid = mockAnswer.Confidence > 0.5
+                    ExtractedAnswer = aiResponse.Answer,
+                    ConfidenceScore = aiResponse.Confidence,
+                    SourceText = aiResponse.SourceText,
+                    SourcePage = aiResponse.SourcePage,
+                    Reasoning = aiResponse.Reasoning,
+                    IsValid = aiResponse.Confidence > 0.3, // Minimum confidence threshold
+                    ValidationErrors = new List<string>()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling OpenAI API for question {QuestionId}", question.Id);
+                
+                // Fallback to mock response
+                return new QuestionAnswerMatch
+                {
+                    QuestionId = question.Id,
+                    QuestionText = question.QuestionText,
+                    ExtractedAnswer = "No information found",
+                    ConfidenceScore = 0.1,
+                    SourceText = "",
+                    SourcePage = 0,
+                    Reasoning = "Failed to process question due to API error",
+                    IsValid = false,
+                    ValidationErrors = new List<string> { ex.Message }
                 };
             }
         }
 
         private async Task<MockAiResponse> GenerateAiAnswerAsync(Question question, string pdfText)
         {
+            // If no API key is configured, use mock responses
+            if (string.IsNullOrEmpty(_openAiApiKey))
+            {
+                _logger.LogInformation("No OpenAI API key configured, using mock response for question {QuestionId}", question.Id);
+                return await GenerateMockAnswerAsync(question, pdfText);
+            }
+
             try
             {
                 var prompt = $@"
@@ -183,61 +241,135 @@ Help Text: {question.HelpText ?? "None"}
 PDF Content (first 4000 characters):
 {pdfText.Substring(0, Math.Min(4000, pdfText.Length))}
 
-Please analyze the PDF content and provide an answer to the question. Respond in JSON format with the following structure:
+Please analyze the PDF content and provide an answer to the question. 
+
+IMPORTANT: Respond with ONLY valid JSON, no markdown formatting, no code blocks, no additional text.
+
+Required JSON structure:
 {{
     ""answer"": ""The extracted answer"",
     ""confidence"": 0.85,
     ""sourceText"": ""The specific text from the PDF that supports this answer"",
     ""sourcePage"": 15,
     ""reasoning"": ""Brief explanation of how you arrived at this answer""
-}}
+}}";
 
-If no relevant information is found, set confidence to 0.1 and answer to ""No information found"".";
+                // _logger.LogInformation("Sending OpenAI API request for question {QuestionId}. Prompt sample: {PromptSample}", 
+                //     question.Id, prompt.Substring(0, Math.Min(200, prompt.Length)));
 
                 var requestBody = new
                 {
                     model = "gpt-4o-mini",
                     messages = new[]
                     {
-                        new { role = "system", content = "You are a helpful AI assistant that analyzes documents and extracts information in JSON format." },
                         new { role = "user", content = prompt }
                     },
-                    max_tokens = 1000,
-                    temperature = 0.1
+                    temperature = 0.1,
+                    max_tokens = 500
                 };
 
-                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var jsonContent = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
 
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _openAiApiKey);
+                // Add Authorization header
+                if (!string.IsNullOrEmpty(_openAiApiKey))
+                {
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _openAiApiKey);
+                }
 
-                var response = await _httpClient.PostAsync(_openAiEndpoint, content);
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var response = await _httpClient.PostAsync("https://api.openai.com/v1/chat/completions", content);
+                stopwatch.Stop();
+
                 var responseContent = await response.Content.ReadAsStringAsync();
+
+                // _logger.LogInformation("OpenAI API response for question {QuestionId} received in {ElapsedMs:F2}ms. Status: {Status}. Response sample: {ResponseSample}", 
+                //     question.Id, stopwatch.ElapsedMilliseconds, response.StatusCode, responseContent.Substring(0, Math.Min(200, responseContent.Length)));
 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseJson = System.Text.Json.JsonSerializer.Deserialize<OpenAiResponse>(responseContent);
-                    var aiResponse = System.Text.Json.JsonSerializer.Deserialize<AiResponse>(responseJson.choices[0].message.content);
+                    var messageContent = responseJson.choices[0].message.content;
                     
-                    return new MockAiResponse
+                    // Clean the message content - remove markdown code blocks and trim whitespace
+                    var cleanedContent = messageContent.Trim();
+                    
+                    // Remove markdown code blocks if present
+                    if (cleanedContent.StartsWith("```json"))
                     {
-                        Answer = aiResponse.answer,
-                        Confidence = aiResponse.confidence,
-                        SourceText = aiResponse.sourceText,
-                        SourcePage = aiResponse.sourcePage,
-                        Reasoning = aiResponse.reasoning
-                    };
+                        cleanedContent = cleanedContent.Substring(7); // Remove ```json
+                    }
+                    if (cleanedContent.StartsWith("```"))
+                    {
+                        cleanedContent = cleanedContent.Substring(3); // Remove ```
+                    }
+                    if (cleanedContent.EndsWith("```"))
+                    {
+                        cleanedContent = cleanedContent.Substring(0, cleanedContent.Length - 3); // Remove ```
+                    }
+                    
+                    cleanedContent = cleanedContent.Trim();
+
+                    // _logger.LogInformation("Cleaned OpenAI response content for question {QuestionId}: {CleanedContent}", 
+                    //     question.Id, cleanedContent.Substring(0, Math.Min(200, cleanedContent.Length)));
+
+                    try
+                    {
+                        var aiResponse = System.Text.Json.JsonSerializer.Deserialize<AiResponse>(cleanedContent);
+                        return new MockAiResponse
+                        {
+                            Answer = aiResponse.answer,
+                            Confidence = aiResponse.confidence,
+                            SourceText = aiResponse.sourceText,
+                            SourcePage = aiResponse.sourcePage,
+                            Reasoning = aiResponse.reasoning
+                        };
+                    }
+                    catch (System.Text.Json.JsonException jsonEx)
+                    {
+                        _logger.LogError(jsonEx, "Error parsing OpenAI JSON response for question {QuestionId}. Raw content: {RawContent}", 
+                            question.Id, cleanedContent);
+                        
+                        // Fallback to mock response
+                        return new MockAiResponse
+                        {
+                            Answer = "No information found",
+                            Confidence = 0.1,
+                            SourceText = "",
+                            SourcePage = 0,
+                            Reasoning = "Failed to parse AI response"
+                        };
+                    }
                 }
                 else
                 {
-                    _logger.LogWarning("OpenAI API call failed: {StatusCode} - {Response}", response.StatusCode, responseContent);
-                    throw new Exception($"OpenAI API call failed: {response.StatusCode}");
+                    _logger.LogWarning("OpenAI API call failed for question {QuestionId}. Status: {Status}, Response: {Response}", 
+                        question.Id, response.StatusCode, responseContent);
+                    
+                    // Fallback to mock response
+                    return new MockAiResponse
+                    {
+                        Answer = "No information found",
+                        Confidence = 0.1,
+                        SourceText = "",
+                        SourcePage = 0,
+                        Reasoning = "API call failed"
+                    };
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error calling OpenAI API for question {QuestionId}", question.Id);
-                throw;
+                
+                // Fallback to mock response
+                return new MockAiResponse
+                {
+                    Answer = "No information found",
+                    Confidence = 0.1,
+                    SourceText = "",
+                    SourcePage = 0,
+                    Reasoning = "Exception occurred during API call"
+                };
             }
         }
 

@@ -168,7 +168,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
 
         // Get the most common attribute type to use for sector information
         var allAttributes = responses
-            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
+            .SelectMany(r => r.CampaignAssignment?.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>())
             .ToList();
             
         var primaryAttributeType = allAttributes.Any() ? 
@@ -176,15 +176,16 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
             "Unknown";
 
         return responses
+            .Where(r => r.CampaignAssignment?.TargetOrganization != null)
             .GroupBy(r => new { 
-                r.CampaignAssignment.TargetOrganization.Id, 
-                r.CampaignAssignment.TargetOrganization.Name
+                Id = r.CampaignAssignment.TargetOrganization.Id, 
+                Name = r.CampaignAssignment.TargetOrganization.Name
             })
             .Select(g => 
             {
                 var firstResponse = g.First();
-                var sector = firstResponse.CampaignAssignment.OrganizationRelationship?.Attributes
-                    .FirstOrDefault(a => a.AttributeType == primaryAttributeType)?.AttributeValue ?? "Unknown";
+                var sector = firstResponse.CampaignAssignment?.OrganizationRelationship?.Attributes
+                    ?.FirstOrDefault(a => a.AttributeType == primaryAttributeType)?.AttributeValue ?? "Unknown";
 
                 return new CompanyFilterOption
                 {
@@ -212,7 +213,7 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
 
         // Get the most common attribute type to use as the primary filter
         var allAttributes = responses
-            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
+            .SelectMany(r => r.CampaignAssignment?.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>())
             .ToList();
             
         if (!allAttributes.Any())
@@ -232,12 +233,12 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
         _logger.LogInformation($"Using '{primaryAttributeType}' as primary grouping attribute for sectors filter");
 
         return responses
-            .GroupBy(r => r.CampaignAssignment.OrganizationRelationship?.Attributes
+            .GroupBy(r => r.CampaignAssignment?.OrganizationRelationship?.Attributes
                 ?.FirstOrDefault(a => a.AttributeType == primaryAttributeType)?.AttributeValue ?? "Unknown")
             .Select(g => new SectorFilterOption
             {
                 Name = g.Key,
-                CompanyCount = g.Select(r => r.CampaignAssignment.TargetOrganizationId).Distinct().Count(),
+                CompanyCount = g.Select(r => r.CampaignAssignment?.TargetOrganizationId).Where(id => id != null).Distinct().Count(),
                 ResponseCount = g.Count()
             })
             .OrderBy(s => s.Name)
@@ -257,7 +258,9 @@ public class FlexibleAnalyticsService : IFlexibleAnalyticsService
 
         // Get all attributes from all organizations
         var allAttributes = responses
-            .SelectMany(r => r.CampaignAssignment.OrganizationRelationship!.Attributes ?? new List<OrganizationRelationshipAttribute>())
+            .SelectMany(r =>
+                r.CampaignAssignment?.OrganizationRelationship?.Attributes ?? new List<OrganizationRelationshipAttribute>()
+            )
             .ToList();
 
         // Group by attribute type and collect values

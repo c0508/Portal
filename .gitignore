@@ -337,3 +337,6 @@ appsettings.local.json
 
 # MacOS
 .DS_Store 
+
+# Ignore environment variable files
+.env 
