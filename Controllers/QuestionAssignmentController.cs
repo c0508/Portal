@@ -345,9 +345,10 @@ public class QuestionAssignmentController : BaseController
 
     private bool CanManageAssignments(CampaignAssignment campaignAssignment)
     {
-        // Campaign creators and organization admins can manage assignments
+        // Campaign creators, organization admins, campaign managers, and platform admins can manage assignments
         return campaignAssignment.Campaign.CreatedById == CurrentUserId ||
                IsOrgAdmin ||
+               IsCampaignManager ||
                IsPlatformAdmin;
     }
 
@@ -369,10 +370,11 @@ public class QuestionAssignmentController : BaseController
         if (campaignAssignment == null)
             return false;
 
-        // Campaign creators, organization admins, and lead responders can view progress
+        // Campaign creators, organization admins, campaign managers, and lead responders can view progress
         return campaignAssignment.Campaign.CreatedById == CurrentUserId ||
                campaignAssignment.LeadResponderId == CurrentUserId ||
                IsOrgAdmin ||
+               IsCampaignManager ||
                IsPlatformAdmin;
     }
 

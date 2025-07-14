@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace ESGPlatform.Controllers;
 
-[Authorize]
+[Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
 public class ResponseController : BaseController
 {
     private readonly ApplicationDbContext _context;
@@ -47,7 +47,7 @@ public class ResponseController : BaseController
             .Include(ca => ca.TargetOrganization);
 
         // Apply access control filtering
-        if (!IsPlatformAdmin)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
         {
             if (IsCurrentOrgSupplierType)
             {
@@ -88,7 +88,7 @@ public class ResponseController : BaseController
             .Where(d => d.ToUserId == currentUserId && d.IsActive);
 
         // Apply access control to delegations
-        if (!IsPlatformAdmin)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
         {
             if (IsCurrentOrgSupplierType)
             {
@@ -117,7 +117,7 @@ public class ResponseController : BaseController
             .Where(qa => qa.AssignedUserId == currentUserId);
 
         // Apply access control to question assignments (manual filtering since we bypassed query filters)
-        if (!IsPlatformAdmin)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
         {
             if (IsCurrentOrgSupplierType)
             {
@@ -884,6 +884,7 @@ public class ResponseController : BaseController
     // Helper method to get assignment with proper access control
     private async Task<CampaignAssignment?> GetAssignmentWithAccessCheckAsync(int assignmentId)
     {
+        _logger.LogInformation("[DEBUG] Start GetAssignmentWithAccessCheckAsync: assignmentId={AssignmentId}, userId={UserId}, orgId={OrgId}, isPlatformAdmin={IsPlatformAdmin}, isSupplier={IsCurrentOrgSupplierType}, isPlatformOrg={IsCurrentOrgPlatformType}", assignmentId, CurrentUserId, CurrentOrganizationId, IsPlatformAdmin, IsCurrentOrgSupplierType, IsCurrentOrgPlatformType);
         // Validate input
         if (assignmentId <= 0)
         {
@@ -907,28 +908,27 @@ public class ResponseController : BaseController
             .Where(ca => ca.Id == assignmentId);
 
         // Apply strict access control filtering
-        if (!IsPlatformAdmin)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
         {
             if (IsCurrentOrgSupplierType)
             {
-                // Supplier organizations can only see assignments targeted to them
+                _logger.LogInformation("[DEBUG] Supplier org access: filtering by TargetOrganizationId={CurrentOrganizationId}", CurrentOrganizationId);
                 assignmentQuery = assignmentQuery.Where(ca => ca.TargetOrganizationId == CurrentOrganizationId);
             }
             else if (IsCurrentOrgPlatformType)
             {
-                // Platform organizations can see assignments for campaigns they created
+                _logger.LogInformation("[DEBUG] Platform org access: filtering by Campaign.OrganizationId={CurrentOrganizationId}", CurrentOrganizationId);
                 assignmentQuery = assignmentQuery.Where(ca => ca.Campaign.OrganizationId == CurrentOrganizationId);
             }
             else
             {
-                // If user doesn't have a valid organization type, deny access
                 _logger.LogWarning("User {UserId} has invalid organization type for assignment {AssignmentId}", CurrentUserId, assignmentId);
                 return null;
             }
         }
 
         var assignment = await assignmentQuery.FirstOrDefaultAsync();
-        
+        _logger.LogInformation("[DEBUG] assignmentQuery result: {Assignment}", assignment);
         if (assignment == null)
         {
             _logger.LogWarning("Assignment {AssignmentId} not found or access denied for user {UserId}", assignmentId, CurrentUserId);
@@ -937,6 +937,7 @@ public class ResponseController : BaseController
 
         // Additional security check: Verify user has direct access to this assignment
         bool hasDirectAccess = await HasDirectAccessToAssignment(assignmentId, CurrentUserId);
+        _logger.LogInformation("[DEBUG] hasDirectAccess={HasDirectAccess} for user {UserId} and assignment {AssignmentId}", hasDirectAccess, CurrentUserId, assignmentId);
         if (!hasDirectAccess)
         {
             _logger.LogWarning("User {UserId} denied access to assignment {AssignmentId} - no direct access", CurrentUserId, assignmentId);
@@ -961,29 +962,43 @@ public class ResponseController : BaseController
         // Check if user is the lead responder
         var isLeadResponder = await _context.CampaignAssignments
             .AnyAsync(ca => ca.Id == assignmentId && ca.LeadResponderId == userId);
-
         if (isLeadResponder)
             return true;
 
         // Check if user has delegations for this assignment
         var hasDelegation = await _context.Delegations
             .AnyAsync(d => d.CampaignAssignmentId == assignmentId && d.ToUserId == userId && d.IsActive);
-
         if (hasDelegation)
             return true;
 
         // Check if user has question assignments for this assignment
         var hasQuestionAssignment = await _context.QuestionAssignments
             .AnyAsync(qa => qa.CampaignAssignmentId == assignmentId && qa.AssignedUserId == userId);
-
         if (hasQuestionAssignment)
             return true;
 
         // Check if user is a reviewer for this assignment
         var isReviewer = await _context.ReviewAssignments
             .AnyAsync(ra => ra.CampaignAssignmentId == assignmentId && ra.ReviewerId == userId);
+        if (isReviewer)
+            return true;
 
-        return isReviewer;
+        // New: Allow OrgAdmin and CampaignManager for the assignment's organization or campaign's organization
+        var assignment = await _context.CampaignAssignments
+            .Include(ca => ca.TargetOrganization)
+            .Include(ca => ca.Campaign)
+            .FirstOrDefaultAsync(ca => ca.Id == assignmentId);
+        if (assignment != null)
+        {
+            // Access if OrgAdmin or CampaignManager for the target org
+            if (assignment.TargetOrganizationId == CurrentOrganizationId && (IsOrgAdmin || IsCampaignManager))
+                return true;
+            // Access if OrgAdmin or CampaignManager for the campaign's owning org
+            if (assignment.Campaign.OrganizationId == CurrentOrganizationId && (IsOrgAdmin || IsCampaignManager))
+                return true;
+        }
+
+        return false;
     }
 
     #region Private Helper Methods

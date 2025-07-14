@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ESGPlatform.Controllers;
 
-[Authorize]
+[Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
 public class CampaignController : BaseController
 {
     private readonly ApplicationDbContext _context;
@@ -47,7 +47,7 @@ public class CampaignController : BaseController
         }
 
         // Apply user rights filtering
-        if (!IsPlatformAdmin)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
         {
             if (IsCurrentOrgSupplierType)
             {
@@ -77,7 +77,7 @@ public class CampaignController : BaseController
 
         Campaign campaign;
 
-        if (!IsPlatformAdmin && IsCurrentOrgSupplierType)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager) && IsCurrentOrgSupplierType)
         {
             // For supplier organizations, load campaign with only their assignments
             campaign = await _context.Campaigns
@@ -116,8 +116,8 @@ public class CampaignController : BaseController
                     .ThenInclude(ca => ca.LeadResponder)
                 .Where(c => c.Id == id);
 
-            // Apply organization-level filtering for platform organizations
-            if (!IsPlatformAdmin && IsCurrentOrgPlatformType)
+            // Apply organization-level filtering for platform organizations, OrgAdmins, and CampaignManagers
+            if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
             {
                 campaignQuery = campaignQuery.Where(c => c.OrganizationId == CurrentOrganizationId);
             }
@@ -140,11 +140,11 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/Create
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> Create()
     {
-        // Only platform organizations can create campaigns
-        if (!IsCurrentOrgPlatformType && !IsPlatformAdmin)
+        // Only platform organizations, org admins, or campaign managers can create campaigns
+        if (!IsCurrentOrgPlatformType && !(IsOrgAdmin || IsCampaignManager || IsPlatformAdmin))
         {
             return Forbid();
         }
@@ -203,11 +203,11 @@ public class CampaignController : BaseController
     // POST: Campaign/Create
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> Create(CampaignCreateViewModel model)
     {
-        // Only platform organizations can create campaigns
-        if (!IsCurrentOrgPlatformType && !IsPlatformAdmin)
+        // Only platform organizations, org admins, or campaign managers can create campaigns
+        if (!IsCurrentOrgPlatformType && !(IsOrgAdmin || IsCampaignManager || IsPlatformAdmin))
         {
             return Forbid();
         }
@@ -242,7 +242,7 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/Edit/5
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null) return NotFound();
@@ -270,7 +270,7 @@ public class CampaignController : BaseController
     // POST: Campaign/Edit/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> Edit(int id, CampaignEditViewModel model)
     {
         if (id != model.Id) return NotFound();
@@ -312,7 +312,7 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/Delete/5
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null) return NotFound();
@@ -326,7 +326,7 @@ public class CampaignController : BaseController
     // POST: Campaign/Delete/5
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
         var campaign = await GetCampaignWithAccessCheckAsync(id);
@@ -463,7 +463,7 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/ManageAssignments/5
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> ManageAssignments(int? id)
     {
         if (id == null) return NotFound();
@@ -475,7 +475,7 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/CreateAssignment/5
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> CreateAssignment(int? campaignId)
     {
         if (campaignId == null) return NotFound();
@@ -494,7 +494,7 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/BulkAssignment/5
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> BulkAssignment(int? campaignId)
     {
         if (campaignId == null) return NotFound();
@@ -515,7 +515,7 @@ public class CampaignController : BaseController
     // POST: Campaign/CreateAssignment
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> CreateAssignment(CampaignAssignmentCreateViewModel model)
     {
         if (ModelState.IsValid)
@@ -532,7 +532,7 @@ public class CampaignController : BaseController
             // Find the organization relationship and validate it exists (unless platform admin)
             OrganizationRelationship? organizationRelationship = null;
             
-            if (!IsPlatformAdmin)
+            if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
             {
                 organizationRelationship = await _context.OrganizationRelationships
                     .FirstOrDefaultAsync(or => or.PlatformOrganizationId == CurrentOrganizationId 
@@ -580,7 +580,7 @@ public class CampaignController : BaseController
     // POST: Campaign/BulkAssignment
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> BulkAssignment(CampaignBulkAssignmentViewModel model)
     {
         if (ModelState.IsValid)
@@ -623,7 +623,7 @@ public class CampaignController : BaseController
                     // Find the organization relationship and validate it exists (unless platform admin)
                     OrganizationRelationship? organizationRelationship = null;
                     
-                    if (!IsPlatformAdmin)
+                    if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
                     {
                         organizationRelationship = await _context.OrganizationRelationships
                             .FirstOrDefaultAsync(or => or.PlatformOrganizationId == CurrentOrganizationId 
@@ -952,7 +952,7 @@ public class CampaignController : BaseController
             .Where(c => c.Id == campaignId);
 
         // Apply user rights filtering
-        if (!IsPlatformAdmin)
+        if (!(IsPlatformAdmin || IsOrgAdmin || IsCampaignManager))
         {
             if (IsCurrentOrgSupplierType)
             {
@@ -970,7 +970,7 @@ public class CampaignController : BaseController
         return await campaignQuery.FirstOrDefaultAsync();
     }
 
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> ViewAssignment(int? id)
     {
         if (id == null) return NotFound();
@@ -988,7 +988,7 @@ public class CampaignController : BaseController
         if (assignment == null) return NotFound();
 
         // Check access rights
-        if (!IsPlatformAdmin && !IsCurrentOrgPlatformType && assignment.TargetOrganizationId != CurrentOrganizationId)
+        if (!(IsPlatformAdmin || IsCurrentOrgPlatformType || IsOrgAdmin || IsCampaignManager))
         {
             return Forbid();
         }
@@ -997,7 +997,7 @@ public class CampaignController : BaseController
     }
 
     // GET: Campaign/EditAssignment/5
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> EditAssignment(int? id)
     {
         if (id == null) return NotFound();
@@ -1012,7 +1012,7 @@ public class CampaignController : BaseController
         if (assignment == null) return NotFound();
 
         // Check access rights
-        if (!IsPlatformAdmin && !IsCurrentOrgPlatformType && assignment.TargetOrganizationId != CurrentOrganizationId)
+        if (!(IsPlatformAdmin || IsCurrentOrgPlatformType || IsOrgAdmin || IsCampaignManager))
         {
             return Forbid();
         }
@@ -1036,7 +1036,7 @@ public class CampaignController : BaseController
     // POST: Campaign/EditAssignment/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> EditAssignment(int id, CampaignAssignmentEditViewModel model)
     {
         if (id != model.Id) return NotFound();
@@ -1049,7 +1049,7 @@ public class CampaignController : BaseController
                 if (assignment == null) return NotFound();
 
                 // Check access rights
-                if (!IsPlatformAdmin && !IsCurrentOrgPlatformType && assignment.TargetOrganizationId != CurrentOrganizationId)
+                if (!(IsPlatformAdmin || IsCurrentOrgPlatformType || IsOrgAdmin || IsCampaignManager))
                 {
                     return Forbid();
                 }
@@ -1082,14 +1082,14 @@ public class CampaignController : BaseController
     // POST: Campaign/DeleteAssignment/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> DeleteAssignment(int id)
     {
         var assignment = await _context.CampaignAssignments.FindAsync(id);
         if (assignment != null)
         {
             // Check access rights
-            if (!IsPlatformAdmin && !IsCurrentOrgPlatformType)
+            if (!(IsPlatformAdmin || IsCurrentOrgPlatformType || IsOrgAdmin || IsCampaignManager))
             {
                 return Forbid();
             }
@@ -1190,7 +1190,7 @@ public class CampaignController : BaseController
     // POST: Campaign/CloseCampaign/5
     [HttpPost]
     [ValidateAntiForgeryToken]
-    [Authorize(Policy = "OrgAdminOrHigher")]
+    [Authorize(Roles = "PlatformAdmin,OrgAdmin,CampaignManager")]
     public async Task<IActionResult> CloseCampaign(int id)
     {
         var campaign = await GetCampaignWithAccessCheckAsync(id);
